@@ -1,0 +1,8 @@
+.DS_Store
+app/node_modules/
+app/dist/
+app/public/dataset.zip
+# dataset — not pushed to the repo
+audio/
+metadata.json
+peaks/

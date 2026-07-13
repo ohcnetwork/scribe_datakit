@@ -1,0 +1,3 @@
+# Batch transcription (transcribe.py). Apple Silicon — MLX build of Whisper.
+# On CUDA, use faster-whisper instead (see transcribe.py).
+mlx-whisper
