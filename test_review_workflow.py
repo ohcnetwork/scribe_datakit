@@ -179,6 +179,8 @@ def test_full_loop():
         assert a["segments"][0]["generated_translation"] == "e0"
         assert b["status"] == "flagged"
         assert hub.prs[1]["status"] == "merged"
+        assert ann.state()["batches"][0]["state"] == "done"
+        assert bob.state()["batches"][0]["state"] == "done"
 
         # QA reuses the same flow, starting from the reviewed text
         qa_batch = publish(hub, doc, kind="qa")[0]["name"]

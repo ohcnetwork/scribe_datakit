@@ -179,10 +179,9 @@ class Reviewer:
         rows = []
         for name in self.hub.list_batches():
             c = claims.get(name)
-            state = "available" if not c else "submitted" if c["status"] in ("open", "merged") \
-                else "mine" if c["author"] == user else "taken"
-            if c and c["author"] != user and state == "submitted":
-                state = "taken"
+            state = "available" if not c else "done" if c["status"] == "merged" \
+                else "taken" if c["author"] != user \
+                else "submitted" if c["status"] == "open" else "mine"
             rows.append({"name": name, "state": state, "reviewer": c["author"] if c else None,
                          "local": os.path.exists(os.path.join(self._dir(name), "draft.json"))})
         return {"user": user, "repo": self.hub.repo, "batches": rows}

@@ -55,8 +55,8 @@ such as the wrong audio, use **Flag clip**.
 
 ## How to write the text
 
-- **Transcript:** write what was said, in the language it was said. Keep false starts out
-  only if they carry no meaning.
+- **Transcript:** write what was said, in the language it was said. Leave out "um" and
+  false starts unless they change the meaning.
 - **English terms inside Malayalam or Hindi speech:** keep them in English letters, such as
   `patient` or `paracetamol`.
 - **Translation:** translate what was said. Don't summarise, tidy up or add anything.

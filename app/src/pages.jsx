@@ -73,6 +73,7 @@ export function Batches() {
                 {b.state === 'mine' && 'Claimed by you'}
                 {b.state === 'taken' && `Claimed by ${b.reviewer}`}
                 {b.state === 'submitted' && 'Submitted, waiting for the maintainer'}
+                {b.state === 'done' && `Finished by ${b.reviewer}`}
               </div>
             </div>
             {b.state === 'available' && <Button onClick={() => claim(b.name)} disabled={!!busy}>{busy === b.name ? 'Downloading…' : 'Claim'}</Button>}
