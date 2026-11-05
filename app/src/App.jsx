@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
-import { AudioLines, CheckCircle2, ListMusic, Moon, Sun } from 'lucide-react'
+import { AudioLines, BookOpen, CheckCircle2, ListMusic, Moon, Sun } from 'lucide-react'
 import { ToastProvider, useToast } from './store'
 import { Batch, Batches, Clip } from './pages'
 
@@ -31,6 +31,7 @@ function Shell() {
         </div>
         <nav className="nav">
           <NavLink to="/" end><ListMusic size={17} strokeWidth={1.75} /><span>Batches</span></NavLink>
+          <a href="/guide.html" target="_blank" rel="noreferrer"><BookOpen size={17} strokeWidth={1.75} /><span>Reviewer guide</span></a>
         </nav>
       </aside>
 

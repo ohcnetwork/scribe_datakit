@@ -24,6 +24,11 @@ try {
   await page.getByText('Signed in as from-token').waitFor()
   step('sign in, including a wrong token')
 
+  const [guide] = await Promise.all([page.waitForEvent('popup'), page.getByRole('link', { name: 'Reviewer guide' }).click()])
+  await guide.getByRole('heading', { name: 'The whole process' }).waitFor()
+  await guide.close()
+  step('reviewer guide opens from the app')
+
   // batches: taken ones can't be claimed
   assert.match(await body(), /Claimed by someone-else/)
   assert.equal(await button('Claim').count(), 1)

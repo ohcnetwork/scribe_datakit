@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body { margin: 0; }</style>
+<script>try { var t = localStorage.getItem("scribe-theme"); if (t) document.documentElement.dataset.theme = t } catch (e) {}</script>
+<title>Scribe Reviewer Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Malayalam:wght@400;600&display=swap">
+<style>
+/* Layout: one long left-aligned reading column, opened by a full-width recording that is
+   cut into segments. The cut marks recur as the page's section rules. */
+:root {
+  --bg: #eef3f6;
+  --panel: #ffffff;
+  --ink: #10242f;
+  --muted: #50646f;
+  --line: #c9d6dd;
+  --accent: #0b6e8a;
+  --accent-ink: #ffffff;
+  --mark: #c2410c;
+  --mark-soft: #fde8dc;
+  --ok: #17694a;
+  --ok-soft: #dcf1e7;
+  --wave-a: #0b6e8a;
+  --wave-b: #5b4bb0;
+  --wave-c: #17694a;
+  --code-bg: #10242f;
+  --code-fg: #e4eef3;
+  --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --body: "Atkinson Hyperlegible", "Noto Sans Malayalam", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1a21; --panel: #16262f; --ink: #e6eff3; --muted: #9db1bb; --line: #2c414c;
+    --accent: #5cc4e0; --accent-ink: #06222c; --mark: #fb9a66; --mark-soft: #43251a;
+    --ok: #6fd3a8; --ok-soft: #173a2c; --wave-a: #5cc4e0; --wave-b: #a99bf0; --wave-c: #6fd3a8;
+    --code-bg: #07131a; --code-fg: #e4eef3; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1a21; --panel: #16262f; --ink: #e6eff3; --muted: #9db1bb; --line: #2c414c;
+  --accent: #5cc4e0; --accent-ink: #06222c; --mark: #fb9a66; --mark-soft: #43251a;
+  --ok: #6fd3a8; --ok-soft: #173a2c; --wave-a: #5cc4e0; --wave-b: #a99bf0; --wave-c: #6fd3a8;
+  --code-bg: #07131a; --code-fg: #e4eef3; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--body); }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
+.wrap {
+  max-width: 880px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.6rem, 8vw, 4.6rem); font-weight: 800; line-height: 1.02; letter-spacing: -.02em; }
+h2 { font-size: clamp(1.7rem, 4.5vw, 2.3rem); font-weight: 700; line-height: 1.12; }
+h3 { font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
+p { margin: 0; max-width: 65ch; }
+code { font: 500 .88em var(--mono); }
+
+header { padding-block: 56px 0; }
+.eyebrow { font: 500 .8rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.hero { display: grid; gap: 18px; }
+.lede { font-size: 1.22rem; line-height: 1.5; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.btn { display: inline-block; padding: 11px 18px; border-radius: 6px; font-weight: 700; text-decoration: none; border: 2px solid var(--accent); }
+.btn.solid { background: var(--accent); color: var(--accent-ink); }
+.btn.line { color: var(--accent); }
+
+.recording { margin-top: 40px; }
+.recording svg { display: block; width: 100%; height: 132px; }
+.times { display: grid; grid-template-columns: 28fr 19fr 13fr; font: 400 .78rem var(--mono); color: var(--muted); }
+.times span { border-left: 2px solid var(--mark); padding: 4px 0 0 6px; min-width: 0; }
+.caption { font-size: .92rem; color: var(--muted); margin-top: 10px; }
+
+section { padding-block: 56px 0; display: grid; gap: 22px; }
+section > .head { display: grid; gap: 8px; border-top: 2px solid var(--ink); padding-top: 18px; }
+.muted { color: var(--muted); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 26px; counter-reset: s; }
+.steps > li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 14px; counter-increment: s; }
+.steps > li::before {
+  content: counter(s); grid-row: span 2; font: 800 1.9rem/1 var(--display); color: var(--accent);
+}
+.steps .body { display: grid; gap: 10px; min-width: 0; }
+
+.cmd { background: var(--code-bg); color: var(--code-fg); border-radius: 6px; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; min-width: 0; }
+.cmd pre { margin: 0; flex: 1; min-width: 0; overflow-x: auto; font: 400 .9rem/1.55 var(--mono); }
+.copy { flex: none; font: 500 .78rem var(--mono); color: var(--code-fg); background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+
+.needs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 26px; }
+.needs li { border-bottom: 1px solid var(--line); padding-bottom: 8px; min-width: 0; }
+.needs b { display: block; }
+
+/* Example of one segment on the review screen */
+.segment { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); font: 400 .82rem var(--mono); color: var(--muted); }
+.seg-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg-col { padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.seg-col + .seg-col { border-left: 1px solid var(--line); }
+.lbl { font: 500 .76rem var(--mono); letter-spacing: .04em; color: var(--muted); }
+.wrong { background: var(--mark-soft); color: var(--mark); padding: 0 3px; border-radius: 3px; font-weight: 700; }
+.right { background: var(--ok-soft); color: var(--ok); padding: 0 3px; border-radius: 3px; font-weight: 700; }
+.ml { font-family: "Noto Sans Malayalam", var(--body); }
+
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 30px; }
+.rules > div { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.danger { border-left: 4px solid var(--mark); padding-left: 14px; }
+
+/* The whole process: one row per stage, with who does it and the status it leaves behind */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; }
+.flow li { display: grid; grid-template-columns: 112px minmax(0, 1fr) 118px; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); align-items: start; }
+.flow li:first-child { border-top: 0; }
+.flow li.you { background: var(--ok-soft); margin-inline: -12px; padding-inline: 12px; border-radius: 6px; border-top-color: transparent; }
+.flow li.you + li { border-top-color: transparent; }
+.who { font: 500 .8rem/1.6 var(--mono); color: var(--muted); min-width: 0; }
+.you .who { color: var(--ok); }
+.flow .text { display: grid; gap: 2px; min-width: 0; }
+.status { font: 500 .78rem/1.6 var(--mono); text-align: right; color: var(--accent); min-width: 0; overflow-wrap: anywhere; }
+.flow-key { display: grid; grid-template-columns: 112px minmax(0, 1fr) 118px; gap: 14px; font: 500 .74rem var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.flow-key span:last-child { text-align: right; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); }
+th { font: 500 .78rem var(--mono); letter-spacing: .04em; color: var(--muted); }
+
+footer { padding-block: 56px 48px; color: var(--muted); font-size: .92rem; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .needs, .rules, .seg-body { grid-template-columns: minmax(0, 1fr); }
+  .seg-col + .seg-col { border-left: 0; border-top: 1px solid var(--line); }
+  .flow-key { display: none; }
+  .flow li { grid-template-columns: minmax(0, 1fr) auto; }
+  .flow .who { grid-column: 1; grid-row: 1; }
+  .flow .status { grid-column: 2; grid-row: 1; }
+  .flow .text { grid-column: 1 / -1; }
+  .steps > li { grid-template-columns: 34px minmax(0, 1fr); }
+}
+</style>
+
+<header class="wrap">
+  <div class="hero">
+    <span class="eyebrow">Scribe speech dataset · for reviewers</span>
+    <h1>Listen. Fix the text. Send it back.</h1>
+    <p class="lede">Whisper has written a first draft for each clinical recording. You check that draft against the audio, so the speech models trained on it learn from text a person has confirmed.</p>
+    <div class="actions">
+      <a class="btn solid" href="#start">Get started</a>
+      <a class="btn line" href="#review">Review a batch</a>
+      <a class="btn line" href="#process">See the whole process</a>
+    </div>
+  </div>
+  <div class="recording" aria-hidden="true">
+    <svg id="wave" viewBox="0 0 880 132" preserveAspectRatio="none"></svg>
+    <div class="times"><span>segment 1 · 0:00</span><span>segment 2 · 0:28</span><span>3 · 0:47</span></div>
+  </div>
+  <p class="caption">An illustration of one recording. Long recordings are cut at natural pauses into segments of up to 28 seconds, and you review one segment at a time.</p>
+</header>
+
+<main class="wrap">
+  <section id="start">
+    <div class="head">
+      <h2>Get started</h2>
+      <p class="muted">Setup takes a few minutes and you only do it once. The app runs on your own computer.</p>
+    </div>
+    <ul class="needs">
+      <li><b>Hugging Face account</b>Free. <a href="https://huggingface.co/join">Create one</a> if you don't have it.</li>
+      <li><b>Git</b><a href="https://git-scm.com/downloads">Download Git</a></li>
+      <li><b>Python 3.11 or newer</b><a href="https://www.python.org/downloads/">Download Python</a></li>
+      <li><b>Node 18 or newer</b><a href="https://nodejs.org">Download Node</a></li>
+    </ul>
+    <ol class="steps">
+      <li><div class="body">
+        <h3>Ask for access</h3>
+        <p>Send the maintainer your Hugging Face username. They'll add you and send you the link to the code.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Install and open the app</h3>
+        <p>Run this in a terminal, using the link from the maintainer. The first run takes a few minutes, then the app opens in your browser.</p>
+        <div class="cmd"><pre id="c1">git clone &lt;link from the maintainer&gt;
+cd scribe_dump
+make review</pre><button class="copy" type="button" data-for="c1">Copy</button></div>
+        <p class="muted">On Windows, run this inside <a href="https://learn.microsoft.com/windows/wsl/install">WSL</a>. Next time, run <code>make review</code> from the same folder. Press Ctrl-C in the terminal to stop the app.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Connect Hugging Face</h3>
+        <p>Open <a href="https://huggingface.co/settings/tokens">your access tokens</a>, choose <b>Create new token</b>, pick the <b>Write</b> type and give it any name. Paste it into the app.</p>
+        <p class="muted">The token stays on your computer. Don't share it with anyone, and don't paste it into a chat.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Claim your first batch</h3>
+        <p>A batch is about 30 minutes of audio. Choose <b>Claim</b> and its audio downloads to your computer. Other reviewers will see it's taken.</p>
+      </div></li>
+    </ol>
+    <div class="note">
+      <h3>Using Claude Code?</h3>
+      <p>Open Claude Code in the <code>scribe_dump</code> folder and ask it to set up the review app. It will check your tools and start the app. You still paste the token into the app yourself.</p>
+    </div>
+  </section>
+
+  <section id="review">
+    <div class="head">
+      <h2>Review a batch</h2>
+      <p class="muted">Your work saves after each box, so you can stop and come back.</p>
+    </div>
+    <ol class="steps">
+      <li><div class="body"><h3>Open a clip</h3><p>The waveform plays the whole recording. Each segment has its own play button for just that part.</p></div></li>
+      <li><div class="body"><h3>Check the languages</h3><p>Type what's really spoken, such as <code>ml, en</code>. Whisper's guess is often wrong. For English-only audio, the translation boxes disappear.</p></div></li>
+      <li><div class="body"><h3>Review each segment</h3><p>Listen, then fix the text. If it's already right, choose <b>Accept as is</b>. A box you don't touch isn't counted as reviewed.</p></div></li>
+      <li><div class="body"><h3>Choose Mark reviewed</h3><p>Each segment needs at least one reviewed box. If you're annotating in English only, you can leave the transcript boxes alone. The app then takes you to the next clip.</p></div></li>
+      <li><div class="body"><h3>Choose Submit batch</h3><p>Do this when every clip is done. It sends your work to the maintainer. Until then your work is only on this computer, so finish a batch on the machine you started it on.</p></div></li>
+    </ol>
+    <figure class="segment" style="margin:0">
+      <div class="seg-top"><span>Example segment · 0:28 to 0:47</span><span>invented for this guide</span></div>
+      <div class="seg-body">
+        <div class="seg-col">
+          <span class="lbl">Whisper's translation</span>
+          <p>The patient has <span class="wrong">fever</span> for three days. Give paracetamol <span class="wrong">50</span> mg.</p>
+        </div>
+        <div class="seg-col">
+          <span class="lbl">After your review</span>
+          <p>The patient has had <span class="right">no fever</span> for three days. Give paracetamol <span class="right">500</span> mg.</p>
+        </div>
+      </div>
+    </figure>
+    <p class="muted">Two small words changed the clinical meaning, and Whisper's version still read smoothly. That's why every line gets checked against the audio.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>If you find</th><th>Do this</th></tr></thead>
+      <tbody>
+        <tr><td>A segment with no real speech</td><td>Tick <b>No usable speech</b></td></tr>
+        <tr><td>A problem with the whole clip, such as the wrong audio</td><td>Choose <b>Flag clip</b></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="writing">
+    <div class="head"><h2>How to write the text</h2></div>
+    <div class="rules">
+      <div><h3>Transcript</h3><p>Write what was said, in the language it was said, such as <span class="ml">പനി ഇല്ല</span>. Leave out "um" and false starts unless they change the meaning.</p></div>
+      <div><h3>Translation</h3><p>Translate what was said. Don't summarise, tidy up or add anything.</p></div>
+      <div><h3>English words in other speech</h3><p>Keep them in English letters, such as <code>patient</code> or <code>paracetamol</code>.</p></div>
+      <div><h3>Can't make out a word</h3><p>Write <code>[unclear]</code>. Don't guess.</p></div>
+    </div>
+    <div class="danger">
+      <h3>Take extra care with these</h3>
+      <p>Write numbers, units and doses exactly as spoken, and listen again if you're unsure. Doses, left and right, and negation such as "no fever" need the closest attention, because one wrong word changes the meaning.</p>
+    </div>
+  </section>
+
+  <section id="process">
+    <div class="head">
+      <h2>The whole process</h2>
+      <p class="muted">Where a recording goes, from upload to dataset release. Your part is highlighted.</p>
+    </div>
+    <div>
+      <div class="flow-key"><span>Who</span><span>Stage</span><span>Status after</span></div>
+      <ol class="flow">
+        <li><span class="who">Maintainer</span><div class="text"><h3>Add a collection</h3><p>Recordings come in as a named collection.</p></div><span class="status">pending</span></li>
+        <li><span class="who">Automatic</span><div class="text"><h3>Cut into segments</h3><p>Each recording is split at pauses, up to 28 seconds per segment.</p></div><span class="status">pending</span></li>
+        <li><span class="who">Whisper</span><div class="text"><h3>Write the first draft</h3><p>Whisper produces a transcript and an English translation for each segment. This machine text is kept apart from your text and is never overwritten.</p></div><span class="status">pending</span></li>
+        <li><span class="who">Maintainer</span><div class="text"><h3>Publish batches</h3><p>Recordings are grouped into batches of about 30 minutes.</p></div><span class="status">pending</span></li>
+        <li class="you"><span class="who">You</span><div class="text"><h3>Review and submit</h3><p>You claim a batch, correct it against the audio and submit it.</p></div><span class="status">reviewed or flagged</span></li>
+        <li><span class="who">Maintainer</span><div class="text"><h3>Check and accept</h3><p>Your submission is checked, then added to the dataset with your username as the reviewer.</p></div><span class="status">reviewed</span></li>
+        <li><span class="who">QA reviewer</span><div class="text"><h3>Second check, if needed</h3><p>A QA batch starts from the first reviewer's text. The QA reviewer checks it against the audio, fixes anything wrong and chooses <b>Mark QA complete</b>.</p></div><span class="status">qa_complete</span></li>
+        <li><span class="who">Maintainer</span><div class="text"><h3>Finalize</h3><p>Only the maintainer can mark a recording final.</p></div><span class="status">final</span></li>
+        <li><span class="who">Maintainer</span><div class="text"><h3>Release</h3><p>The dataset is published on Hugging Face for training and fine-tuning, including models that turn Malayalam and mixed-language clinical speech into English text.</p></div><span class="status">final</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="help">
+    <div class="head"><h2>If something goes wrong</h2></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Problem</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>"Hugging Face didn't accept that token"</td><td>Create a new token with the <b>Write</b> type.</td></tr>
+        <tr><td>The batch list is empty or won't load</td><td>Ask the maintainer to confirm your account has access.</td></tr>
+        <tr><td>"already claimed this batch"</td><td>Someone got there first. Choose another batch.</td></tr>
+        <tr><td>You can't finish a batch</td><td>Tell the maintainer, who can release it for someone else.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</main>
+
+<footer class="wrap"><p>Keep the <code>review_work</code> folder until your batch is submitted. It holds your unsent work.</p></footer>
+
+<script>
+(function () {
+  // Deterministic bars, so the recording looks the same on every load.
+  var svg = document.getElementById('wave'), W = 880, H = 132, step = 5, seed = 7;
+  var rand = function () { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  var cuts = [0, 28 / 60, 47 / 60, 1], colors = ['--wave-a', '--wave-b', '--wave-c'], out = '';
+  for (var x = 0; x < W; x += step) {
+    var t = x / W, seg = t < cuts[1] ? 0 : t < cuts[2] ? 1 : 2;
+    var pause = Math.min(Math.abs(t - cuts[1]), Math.abs(t - cuts[2])) < .012;
+    var phrase = Math.abs(Math.sin(t * 34)) * .7 + .3;
+    var h = pause ? 3 : Math.max(5, (rand() * .75 + .25) * phrase * (H - 12));
+    out += '<rect x="' + x + '" y="' + ((H - h) / 2).toFixed(1) + '" width="3" height="' + h.toFixed(1) +
+      '" rx="1.5" style="fill:var(' + colors[seg] + ')"/>';
+  }
+  svg.innerHTML = out;
+
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var el = document.getElementById(b.dataset.for), done = function (m) {
+        b.textContent = m; setTimeout(function () { b.textContent = 'Copy'; }, 1500);
+      };
+      var select = function () {
+        var r = document.createRange(); r.selectNodeContents(el);
+        var s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected');
+      };
+      try { navigator.clipboard.writeText(el.textContent).then(function () { done('Copied'); }, select); }
+      catch (e) { select(); }
+    });
+  });
+})();
+</script>
