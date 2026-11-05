@@ -12,7 +12,7 @@ transcode is hard-capped at the known duration and the output is re-probed — a
 whose length disagrees with metadata.json is dropped rather than published.
 
 Incremental: a clip whose .flac already exists is skipped, so re-runs are near-instant.
-Needs the audio locally — run `make pull` first. Push with the `hf` CLI, see
+Needs the audio locally. Push with the `hf` CLI, see
 docs/huggingface.md.
 
     python hf_export.py                      # all healthy clips
@@ -177,7 +177,7 @@ def main():
     ap.add_argument("--include-corrupt", action="store_true", help="include clips with corrupt timestamps")
     ap.add_argument("--force", action="store_true", help="re-transcode every clip")
     ap.add_argument("--license", default="cc-by-4.0")
-    ap.add_argument("--repo", default=os.environ.get("HF_REPO", "gigincg/scribe_dataset"))
+    ap.add_argument("--repo", default=os.environ.get("HF_REPO", "ohcnetwork/scribe_dataset"))
     args = ap.parse_args()
 
     with open(META) as f:

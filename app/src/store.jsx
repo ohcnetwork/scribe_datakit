@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import doc from './data.json'   // metadata baked into the bundle at build time (scripts/bake-metadata.mjs)
 
-// The site is static and credential-free: base facts are baked in at build time
-// (no runtime metadata fetch, no GCS hit per render); audio/peaks come from the
-// public bucket via asset(). User edits (final text / languages / status) live in
+// Base facts are baked in at build time (no runtime metadata fetch); audio/peaks are
+// served locally. User edits (final text / languages / status) live in
 // localStorage, merged on top, then exported as a corrections file to submit as a PR.
 const LS_KEY = 'scribe-edits-v2'
 const OLD_LS_KEY = 'scribe-edits-v1'

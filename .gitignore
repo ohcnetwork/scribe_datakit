@@ -3,8 +3,7 @@
 __pycache__/
 app/node_modules/
 app/dist/
-app/public/dataset.zip
-# dataset — synced from the GCS bucket, never committed
+# dataset: never committed
 audio/
 metadata.json
 metadata.v1.json
@@ -13,7 +12,7 @@ peaks/
 hf/
 # metadata baked into the bundle at build time
 app/src/data.json
-# dev-only symlinks created by `make pull`
+# dev-only symlinks created by `make link`
 app/public/audio
 app/public/peaks
 app/public/metadata.json

@@ -7,9 +7,8 @@ import {
 import Player from './Player'
 import { Button, Input, StatusBadge } from './ui'
 import { useStore, CATEGORIES, STATUSES, NEEDS_TEXT, LOCKED, fmtDur, fmtSize, fmtSampleRate, fmtTotalDur, dirFor, langName, WORKFLOW, WORKFLOW_ORDER, workflowState, clipLangs, primaryLang, isEnglishOnly, shownTranscript, shownTranslation } from './store'
-import { asset } from './asset'
 
-const audioSrc = (c) => asset(`/audio/${c.filename}`)
+const audioSrc = (c) => `/audio/${c.filename}`
 const shortId = (id) => id.slice(0, 8)
 
 // group clips by one key or a list of keys → { count, dur } (single pass)
@@ -199,7 +198,7 @@ export function CategoryBrowse() {
 
 // ============ DOWNLOAD ============
 export function DatasetDownload() {
-  const { clips, doc, showToast } = useStore()
+  const { clips, doc } = useStore()
   if (!doc) return <div className="page" style={{ maxWidth: 940 }}><p>Loading…</p></div>
   const hours = doc.total_duration_sec / 3600
   const totalDur = hours >= 1 ? `${hours.toFixed(1)} h` : `${Math.round(doc.total_duration_sec / 60)} min`
@@ -223,14 +222,14 @@ export function DatasetDownload() {
           <Package size={24} strokeWidth={1.75} />
         </div>
         <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Full corpus archive</div>
-          <div style={{ fontSize: 13, color: 'var(--muted-foreground)', marginTop: 3 }}>dataset.zip · audio/ + metadata.json</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Hugging Face dataset</div>
+          <div style={{ fontSize: 13, color: 'var(--muted-foreground)', marginTop: 3 }}>ohcnetwork/scribe_dataset</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            {['WebM · Opus 48 kHz', 'metadata.json', 'open dataset'].map((t) => <span key={t} className="chip sm">{t}</span>)}
+            {['FLAC · 16 kHz mono', 'metadata.jsonl', 'cc-by-4.0'].map((t) => <span key={t} className="chip sm">{t}</span>)}
           </div>
         </div>
-        <a className="btn lg" href={asset('/dataset.zip')} download onClick={() => showToast('Starting dataset.zip download…')}>
-          <Download size={17} strokeWidth={1.75} />Download .zip
+        <a className="btn lg" href="https://huggingface.co/datasets/ohcnetwork/scribe_dataset" target="_blank" rel="noreferrer">
+          <Download size={17} strokeWidth={1.75} />Open dataset
         </a>
       </div>
 
@@ -241,7 +240,7 @@ export function DatasetDownload() {
             Open any clip and use <strong style={{ color: 'var(--foreground)', fontWeight: 600 }}>Download clip</strong> to grab a single file.
           </p>
         </div>
-        <a className="card" href={asset('/metadata.json')} download style={{ padding: 18, display: 'block' }}>
+        <a className="card" href="/metadata.json" download style={{ padding: 18, display: 'block' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><Braces size={17} strokeWidth={1.75} style={{ color: 'var(--muted-foreground)' }} /><span style={{ fontSize: 14, fontWeight: 600 }}>Manifest (metadata.json)</span></div>
           <p className="mono" style={{ fontSize: 12, color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '8px 0 0' }}>
             {'{ id, collection, filename, duration_sec, spoken_languages, generated_transcript, generated_translation, final_transcript, final_translation, status }'}

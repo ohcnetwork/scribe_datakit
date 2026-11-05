@@ -26,11 +26,10 @@ def check_against_audio(clips):
     bitrate floor can't substitute: genuinely silent clips run at ~2 kbps via opus
     DTX, so low bitrate is not evidence of corruption.
 
-    Skipped when audio/ is absent (the repo is data-free by default) — run
-    `make pull` for the full check.
+    Skipped when audio/ is absent (the repo is data-free by default).
     """
     if not os.path.isdir(AUDIO_DIR):
-        print("audio/ absent — skipping packet cross-check (run `make pull` first)")
+        print("audio/ absent: skipping packet cross-check")
         return
 
     def coded(c):

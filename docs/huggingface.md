@@ -1,22 +1,18 @@
 # Publishing to HuggingFace
 
-The corpus is published to the Hub as a derived artifact. `metadata.json` on the GCS
-bucket stays the single source of truth; the HF dataset is regenerated from it, never
-edited in place. Corrections keep flowing through the app → PR → `make apply-corrections`
-→ `make push` loop, and you re-export afterwards.
+The corpus is published to the Hub as a derived artifact. `metadata.json` stays the
+single source of truth; the HF dataset is regenerated from it, never edited in place.
+Corrections flow through the app → `make apply-corrections`, and you re-export afterwards.
 
 ```
 metadata.json (source of truth)
-      ├─ make push       → GCS bucket   (the app)
-      ├─ make release    → dataset.zip  (raw archive)
-      └─ make hf-export  → hf/          (the ML audience)  →  hf upload
+      └─ make hf-export  → hf/  →  hf upload
 ```
 
 ## Export
 
 ```bash
-make pull         # need the audio locally
-make hf-export
+make hf-export    # needs the audio locally
 ```
 
 Output — HF's `audiofolder` layout, which the Hub auto-detects (no loading script):
@@ -80,7 +76,7 @@ python3 hf_export.py --license cc0-1.0      # dataset card license (default cc-b
 ## Push
 
 Install the CLI and authenticate once (a maintainer credential — never used at runtime
-or in CI, same posture as gcloud):
+or in CI):
 
 ```bash
 brew install hf
@@ -91,18 +87,18 @@ Then upload the export directory as a dataset repo:
 
 ```bash
 cd hf
-hf upload gigincg/scribe_dataset . --repo-type=dataset
+hf upload ohcnetwork/scribe_dataset . --repo-type=dataset
 ```
 
 The CLI content-hashes files, so re-uploads only transfer what changed. Override the
-target repo with `HF_REPO` in `.env` (`make hf-export` echoes the exact push command).
+target repo with the `HF_REPO` environment variable (`make hf-export` echoes the exact push command).
 
 ## Consuming it
 
 ```python
 from datasets import load_dataset
 
-ds = load_dataset("gigincg/scribe_dataset", split="train")
+ds = load_dataset("ohcnetwork/scribe_dataset", split="train")
 ds[0]["audio"]          # {'array': …, 'sampling_rate': 16000}
 ds[0]["final_translation"]
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Play, Pause, Waves } from 'lucide-react'
 import { fmtDur, fmtSampleRate } from './store'
-import { asset } from './asset'
 
 // Canvas waveform drawn from precomputed peaks (/peaks/<id>.json), played through
 // a native <audio> element — Chrome decodes these header-less webm/opus fine while
@@ -28,7 +27,7 @@ export default function Player({ id, src, duration, sampleRate, height = 92, bar
   const [cur, setCur] = useState(0)
 
   useEffect(() => {
-    fetch(asset(`/peaks/${id}.json`))
+    fetch(`/peaks/${id}.json`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { barsRef.current = downsample(d?.peaks, bars); draw(frac()) })
       .catch(() => { barsRef.current = downsample(null, bars); draw(0) })
