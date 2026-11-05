@@ -3,6 +3,9 @@
 You listen to clinical recordings and correct the text Whisper produced. Everything runs
 on your own computer, and your work goes back through your Hugging Face account.
 
+Once the app is open, **Reviewer guide** in its sidebar has these steps, plus the whole
+process from recording to release.
+
 ## Set up
 
 You need [Git](https://git-scm.com/downloads), Python 3.11 or newer,
@@ -80,31 +83,3 @@ the audio, fix anything wrong and choose **Mark QA complete**.
 | The batch list is empty or won't load | Ask the maintainer to confirm your account has access. |
 | "already claimed this batch" | Someone got there first. Choose another batch. |
 | You can't finish a batch | Tell the maintainer, who can release it for someone else. |
-
-## For the maintainer
-
-Add each reviewer's Hugging Face username to `reviewers.txt`. Submissions from anyone else
-are skipped.
-
-```bash
-python3 review_admin.py batches --collection scribe-staging --minutes 30
-make hf-export
-cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset
-
-# when PRs arrive
-python3 review_admin.py merge
-
-# optional second pass: only reviewed clips go into QA batches, then export and upload again
-python3 review_admin.py batches --collection scribe-staging --kind qa
-
-python3 review_admin.py finalize --collection scribe-staging
-python3 review_admin.py finalize --collection scribe-staging --include-reviewed   # skip QA
-```
-
-`merge` applies each published PR and merges it. A PR with any problem is reported and
-left open, and any clips in it that were valid are applied. Re-export and upload afterwards
-so the dataset shows the new text.
-
-To release a batch someone abandoned, close its PR on Hugging Face. It becomes available
-again. Don't delete files in `hf/review/batches/`: `batches` reads them to avoid handing out
-a clip twice.

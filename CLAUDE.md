@@ -4,6 +4,9 @@ Speech dataset tooling. See README.md for the maintainer view and design_spec.md
 data model. `generated_*` is machine text and `final_*` is human text: never copy one into
 the other.
 
+To add recordings, follow docs/ingesting-a-collection.md. For batches, claims and merging,
+see docs/maintaining.md.
+
 ## Setting up the review app for a reviewer
 
 When someone asks you to set up or run the review app, do this from the repo root.

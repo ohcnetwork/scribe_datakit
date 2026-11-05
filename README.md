@@ -3,8 +3,9 @@
 Multilingual clinical speech with Whisper drafts and human-reviewed transcripts and
 English translations, built for fine-tuning speech-to-English models.
 
-Reviewers: start with **[docs/reviewing.md](docs/reviewing.md)**. The rest of this page
-is for the maintainer.
+Reviewers: start with **[docs/reviewing.md](docs/reviewing.md)**. The app has the same
+steps under **Reviewer guide** ([source](app/public/guide.html)). The rest of this page is
+for the maintainer.
 
 The dataset isn't in this repo. Audio, `flac/`, `peaks/` and `metadata.json` are
 git-ignored and stay local; the published copy is
@@ -37,6 +38,9 @@ See [design_spec.md](design_spec.md) for the data model and statuses.
 
 ## Processing audio
 
+To add recordings, see [docs/ingesting-a-collection.md](docs/ingesting-a-collection.md).
+`make ingest COLLECTION=<name>` runs these steps in order:
+
 ```bash
 python3 build_metadata.py    # add new files to metadata.json; --collection names them
 python3 segment_audio.py     # FLAC and segments
@@ -52,7 +56,7 @@ their timeline, so they're usable like any other clip.
 
 ## Review workflow
 
-See [docs/reviewing.md](docs/reviewing.md#for-the-maintainer).
+See [docs/maintaining.md](docs/maintaining.md) for how batches are created, claimed and merged.
 
 ## Tests
 

@@ -1,7 +1,7 @@
 # Reviewers only need `make review`. The rest is for the maintainer.
 HF_REPO ?= ohcnetwork/scribe_dataset
 
-.PHONY: setup review test hf-export
+.PHONY: setup review test ingest hf-export
 
 # One-time setup: Python and Node dependencies.
 setup:
@@ -17,6 +17,15 @@ review:
 
 test:
 	@for t in test_*.py; do echo "== $$t"; python3 $$t || exit 1; done
+
+# Run new files in audio/ through the pipeline. See docs/ingesting-a-collection.md.
+ingest:
+	@test -n "$(COLLECTION)" || { echo "usage: make ingest COLLECTION=<name>"; exit 1; }
+	python3 build_metadata.py --collection $(COLLECTION)
+	python3 segment_audio.py
+	python3 extract_peaks.py
+	python3 transcribe.py
+	python3 test_metadata.py
 
 # Export the corpus as a HuggingFace dataset in hf/. See docs/huggingface.md.
 hf-export:
