@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Batch-transcribe the collection with Whisper large-v3, resumable.
 
-For every clip not yet processed (no `model`), fills: `transcript_auto` (immutable
-model output), `transcript` (starts equal, edited by humans in the app),
-`confidence` (0..1), `no_speech_prob` (0..1), `language`, `model`; and auto-tags
-`category="silence"` for empty/no-speech clips. Safe to Ctrl-C and re-run — it
-writes after each clip and skips finished ones.
+For every clip not yet processed (no `model`), fills: `generated_transcript`
+(immutable model output), `confidence` (0..1), `no_speech_prob` (0..1),
+`whisper_language`, `model`; and auto-tags `category="silence"` for empty/no-speech
+clips. Never writes `final_*`: those hold human-reviewed text only.
+
+`--translate` is a separate pass that fills `generated_translation` (Whisper
+task=translate, X→English) for transcribed clips that aren't English-only. Safe to
+Ctrl-C and re-run: both passes write after each clip and skip finished ones.
 
 Backend: mlx-whisper (Apple-Silicon native, fast). On CUDA, swap the transcribe
 call for faster-whisper — same loop, same fields.
@@ -18,6 +21,7 @@ so the ~7% timestamp-corrupt clips can't expand into hours of gap-filled silence
 Usage:
     python transcribe.py            # transcribe all remaining
     python transcribe.py --limit 5  # do 5 (smoke test)
+    python transcribe.py --translate --limit 5
 """
 import argparse, json, math, os, subprocess, sys, tempfile
 
@@ -46,9 +50,62 @@ def decode_16k(path, duration_sec):
     return wav
 
 
+def clip_languages(c):
+    """Human-confirmed languages win over Whisper's guess."""
+    return c.get("spoken_languages") or [c.get("whisper_language")]
+
+
+def needs_translation(c):
+    """Transcribed, has speech, not yet translated, and not English-only."""
+    return (c.get("generated_translation") is None and bool(c.get("generated_transcript"))
+            and clip_languages(c) != ["en"])
+
+
+def source_language(c):
+    """Language token for task=translate: the first non-English language of the clip."""
+    return next((l for l in clip_languages(c) if l and l != "en"), None)
+
+
+def save(doc):
+    # atomic write: a Ctrl-C mid-dump must not truncate metadata.json to junk
+    tmp = META + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(doc, f, indent=2)
+    os.replace(tmp, META)                       # write-after-each = resumable
+
+
+def translate_all(doc, mlx_whisper, limit):
+    todo = [c for c in doc["clips"] if needs_translation(c)]
+    if limit:
+        todo = todo[:limit]
+    print(f"{len(todo)} clip(s) to translate with {MODEL_NAME}", file=sys.stderr)
+    done = fails = 0
+    for c in todo:
+        wav = None
+        try:
+            wav = decode_16k(os.path.join(AUDIO_DIR, c["filename"]), c.get("duration_sec"))
+            r = mlx_whisper.transcribe(wav, path_or_hf_repo=MODEL, task="translate",
+                                       language=source_language(c))
+            c["generated_translation"] = (r.get("text") or "").strip()
+        except Exception as e:
+            fails += 1
+            print(f"  ✗ FAIL  {c['filename']}: {e}", file=sys.stderr)
+            continue
+        finally:
+            if wav and os.path.exists(wav):
+                os.remove(wav)
+        done += 1
+        save(doc)
+        print(f"  ✓ [{done}/{len(todo)}] {source_language(c)} {c['filename']}: "
+              f"{c['generated_translation'][:50]!r}", file=sys.stderr)
+    print(f"done: {done} translated, {fails} failed / {len(todo)} total", file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="max clips this run (0 = all)")
+    ap.add_argument("--translate", action="store_true",
+                    help="fill generated_translation instead of transcribing")
     args = ap.parse_args()
 
     try:
@@ -57,8 +114,12 @@ def main():
         sys.exit("mlx-whisper not installed. Run: pip install mlx-whisper")
 
     doc = json.load(open(META))
+    if doc.get("schema_version") != 2:
+        sys.exit("metadata.json is not schema v2; run migrate_schema_v2.py first")
+    if args.translate:
+        return translate_all(doc, mlx_whisper, args.limit)
     clips = doc["clips"]
-    # key resumability on `model`, not `transcript`: a silent clip transcribes to
+    # key resumability on `model`, not the text: a silent clip transcribes to
     # an empty string, which must not look "not done" and re-run every time.
     todo = [c for c in clips if not c.get("model")]
     if args.limit:
@@ -83,11 +144,10 @@ def main():
             confidence = round(math.exp(sum(lp) / len(lp)), 3) if lp else None
             no_speech = round(sum(nsp) / len(nsp), 3) if nsp else None
 
-            c["transcript_auto"] = text
-            c["transcript"] = text           # human correction starts from the auto text
+            c["generated_transcript"] = text
             c["confidence"] = confidence
             c["no_speech_prob"] = no_speech
-            c["language"] = r.get("language")
+            c["whisper_language"] = r.get("language")
             c["model"] = MODEL_NAME
             if no_speech is not None and no_speech >= SILENCE_NSP and not text:
                 c["category"] = "silence"    # auto-triage empty/no-speech clips
@@ -100,14 +160,10 @@ def main():
                 os.remove(wav)
 
         done += 1
-        # atomic write: a Ctrl-C mid-dump must not truncate metadata.json to junk
-        tmp = META + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(doc, f, indent=2)
-        os.replace(tmp, META)                       # write-after-each = resumable
+        save(doc)
         tag = f" [{c['category']}]" if c.get("category") == "silence" else ""
-        print(f"  ✓ [{done}/{len(todo)}] {c['language']} conf={c['confidence']}"
-              f"{tag} {c['filename']}: {c['transcript'][:50]!r}", file=sys.stderr)
+        print(f"  ✓ [{done}/{len(todo)}] {c['whisper_language']} conf={c['confidence']}"
+              f"{tag} {c['filename']}: {c['generated_transcript'][:50]!r}", file=sys.stderr)
 
     print(f"done: {done} transcribed, {fails} failed / {len(todo)} total", file=sys.stderr)
 

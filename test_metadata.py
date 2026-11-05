@@ -14,6 +14,7 @@ HERE = os.path.dirname(__file__)
 META = os.path.join(HERE, "metadata.json")
 AUDIO_DIR = os.path.join(HERE, "audio")
 OPUS_FRAME_SEC = 0.06
+STATUSES = ("pending", "reviewed", "qa_complete", "final", "flagged")
 
 
 def check_against_audio(clips):
@@ -55,7 +56,7 @@ def main():
     clips = d["clips"]
     assert clips, "no clips"
     assert d["clip_count"] == len(clips)
-    assert d.get("schema_version") == 1, "schema_version missing/unexpected"
+    assert d.get("schema_version") == 2, "schema_version missing/unexpected"
 
     for c in clips:
         dur = c["duration_sec"]
@@ -65,9 +66,15 @@ def main():
         if dur:
             kbps = c["size_bytes"] * 8 / dur / 1000
             assert kbps >= 1, f"{c['filename']}: {kbps:.2f} kbps — corruption not corrected"
-        assert set(("id", "language", "transcript", "transcript_auto", "confidence",
-                    "no_speech_prob", "model", "status", "category", "container",
-                    "codec", "channels", "bitrate_kbps", "tags")) <= c.keys()
+        assert set(("id", "whisper_language", "spoken_languages", "collection",
+                    "generated_transcript", "generated_translation", "final_transcript",
+                    "final_translation", "confidence", "no_speech_prob", "model", "status",
+                    "category", "container", "codec", "channels", "bitrate_kbps",
+                    "tags")) <= c.keys()
+        assert c["status"] in STATUSES, f"{c['filename']}: bad status {c['status']!r}"
+        if c["status"] in ("reviewed", "qa_complete", "final"):
+            assert c["final_transcript"] is not None or c["final_translation"] is not None, \
+                f"{c['filename']}: {c['status']} with no human text"
 
     total = sum(c["duration_sec"] for c in clips)
     assert abs(total - d["total_duration_sec"]) < 1, "total_duration_sec mismatch"

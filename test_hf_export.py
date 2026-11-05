@@ -3,34 +3,39 @@
 from hf_export import select_clips, row
 
 CLIPS = [
-    {"id": "ok", "filename": "ok.webm", "duration_sec": 5.0, "status": "verified",
-     "transcript": "corrected", "transcript_auto": "auto", "language": "en"},
-    {"id": "unver", "filename": "u.webm", "duration_sec": 3.0, "status": "unverified",
-     "transcript": None, "transcript_auto": "auto only"},
-    {"id": "bad", "filename": "b.webm", "duration_sec": 9.0, "status": "verified",
-     "corrupt": True},
-    {"id": "zero", "filename": "z.webm", "duration_sec": None, "status": "verified"},
+    {"id": "fin", "filename": "ok.webm", "duration_sec": 5.0, "status": "final",
+     "final_transcript": "corrected", "generated_transcript": "auto",
+     "whisper_language": "en", "collection": "c1"},
+    {"id": "rev", "filename": "r.webm", "duration_sec": 4.0, "status": "reviewed",
+     "final_translation": "english"},
+    {"id": "pend", "filename": "u.webm", "duration_sec": 3.0, "status": "pending",
+     "generated_transcript": "auto only"},
+    {"id": "flag", "filename": "f.webm", "duration_sec": 3.0, "status": "flagged"},
+    {"id": "bad", "filename": "b.webm", "duration_sec": 9.0, "status": "final", "corrupt": True},
+    {"id": "zero", "filename": "z.webm", "duration_sec": None, "status": "final"},
 ]
 
 
 def test_select():
     ids = lambda cs: [c["id"] for c in cs]
     # corrupt and duration-less clips are excluded by default
-    assert ids(select_clips(CLIPS)) == ["ok", "unver"]
-    assert ids(select_clips(CLIPS, verified_only=True)) == ["ok"]
-    assert ids(select_clips(CLIPS, include_corrupt=True)) == ["ok", "unver", "bad"]
+    assert ids(select_clips(CLIPS)) == ["fin", "rev", "pend", "flag"]
+    assert ids(select_clips(CLIPS, min_status="reviewed")) == ["fin", "rev"]
+    assert ids(select_clips(CLIPS, min_status="final")) == ["fin"]
+    assert ids(select_clips(CLIPS, include_corrupt=True)) == ["fin", "rev", "pend", "flag", "bad"]
     # a corrupt clip still never slips through without a duration
     assert "zero" not in ids(select_clips(CLIPS, include_corrupt=True))
 
 
 def test_row():
     r = row(CLIPS[0])
-    assert r["file_name"] == "ok.flac"          # points at the transcoded file, not the webm
-    assert r["transcription"] == "corrected"    # human edit wins over the auto transcript
-    assert r["status"] == "verified" and r["language"] == "en"
-    # falls back to the model output, and never emits null text
-    assert row(CLIPS[1])["transcription"] == "auto only"
-    assert row(CLIPS[3])["transcription"] == ""
+    assert r["file_name"] == "fin.flac"         # points at the transcoded file, not the webm
+    assert r["final_transcript"] == "corrected" and r["generated_transcript"] == "auto"
+    assert r["status"] == "final" and r["collection"] == "c1"
+    # machine text must never fill a human column
+    assert row(CLIPS[2])["final_transcript"] is None
+    assert row(CLIPS[2])["generated_transcript"] == "auto only"
+    assert "transcription" not in r
 
 
 if __name__ == "__main__":

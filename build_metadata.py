@@ -12,7 +12,7 @@ channel layout, bitrate, duration, corruption flag, and container tags. Duration
 computed defensively — these webm files carry no duration header and ~7% have
 corrupt timestamps that gap-fill silence to 24h+; see compute_duration().
 
-User-owned fields (transcript, language, model, status, category) are always
+User-owned fields (final_*, spoken_languages, status, category, collection) are always
 preserved across runs. ffmpeg + ffprobe must be on PATH.
 
     python build_metadata.py            # incremental
@@ -26,15 +26,17 @@ AUDIO_DIR = os.path.join(os.path.dirname(__file__), "audio")
 OUT = os.path.join(os.path.dirname(__file__), "metadata.json")
 EXTS = (".webm", ".mp4", ".ogg", ".mp3", ".wav", ".m4a")
 
-SCHEMA_VERSION = 1   # bump when the clip/doc shape changes; the app warns on mismatch
+SCHEMA_VERSION = 2   # bump when the clip/doc shape changes; the app warns on mismatch
 
 # fields owned by the user / transcription job — never overwritten by a re-probe
-KEEP = ("transcript", "transcript_auto", "confidence", "no_speech_prob",
-        "language", "model", "status", "category")
+KEEP = ("generated_transcript", "generated_translation", "final_transcript",
+        "final_translation", "confidence", "no_speech_prob", "whisper_language",
+        "spoken_languages", "model", "status", "category", "collection")
 MODEL_USER_DEFAULTS = {
-    "transcript_auto": None, "transcript": None, "confidence": None,
-    "no_speech_prob": None, "language": None, "model": None,
-    "status": "unverified", "category": "uncategorized",
+    "generated_transcript": None, "generated_translation": None,
+    "final_transcript": None, "final_translation": None, "confidence": None,
+    "no_speech_prob": None, "whisper_language": None, "spoken_languages": None,
+    "model": None, "status": "pending", "category": "uncategorized",
 }
 # derived fields; if any is missing on a cached record we re-probe it (auto-migrate)
 DERIVED = ("container", "codec", "codec_long", "sample_rate", "channels",
@@ -144,13 +146,16 @@ def probe(fname):
         "corrupt": corrupt,
         "recorded_at": recorded_at,
         "tags": tags,
-        "language": None,
-        "transcript_auto": None,    # immutable Whisper output (transcribe.py)
-        "transcript": None,         # human-corrected, defaults to transcript_auto
+        "whisper_language": None,        # Whisper's guess; unreliable, never hand-edited
+        "spoken_languages": None,        # human-confirmed list, e.g. ["ml", "en"]; null = unconfirmed
+        "generated_transcript": None,    # immutable Whisper output (transcribe.py)
+        "generated_translation": None,   # immutable Whisper task=translate output
+        "final_transcript": None,        # human-reviewed; null until a person reviews it
+        "final_translation": None,       # human-reviewed; null until a person reviews it
         "confidence": None,         # 0..1, mean exp(avg_logprob) over segments
         "no_speech_prob": None,     # 0..1, mean over segments
         "model": None,
-        "status": "unverified",
+        "status": "pending",
         "category": "uncategorized",
     }
 
@@ -163,12 +168,18 @@ def cached(rec):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--force", action="store_true", help="re-probe every file")
+    ap.add_argument("--collection", default="scribe-staging",
+                    help="collection for clips new to the manifest")
     args = ap.parse_args()
 
     prev = {}
     if os.path.exists(OUT):
         with open(OUT) as f:
-            prev = {c["filename"]: c for c in json.load(f).get("clips", [])}
+            old_doc = json.load(f)
+        if old_doc.get("schema_version") != SCHEMA_VERSION:
+            sys.exit(f"{OUT} is schema v{old_doc.get('schema_version')}; "
+                     "run migrate_schema_v2.py first")
+        prev = {c["filename"]: c for c in old_doc.get("clips", [])}
 
     files = sorted(f for f in os.listdir(AUDIO_DIR) if f.lower().endswith(EXTS))
     to_probe = [f for f in files
@@ -189,17 +200,13 @@ def main():
             c = probed[f]
             old = prev.get(f)
             if old:                                  # carry user fields forward
-                for k in KEEP:
-                    if old.get(k) not in (None, "", "unverified", "uncategorized"):
-                        c[k] = old[k]
+                c.update({k: old[k] for k in KEEP if k in old})
         else:
             c = prev[f]                              # cache hit (no re-probe)
         # ensure model/user fields exist on cached records too (schema migration)
         for k, v in MODEL_USER_DEFAULTS.items():
             c.setdefault(k, v)
-        # pre-split records: the old single transcript was the auto output
-        if c.get("transcript") and not c.get("transcript_auto"):
-            c["transcript_auto"] = c["transcript"]
+        c.setdefault("collection", args.collection)
         clips.append(c)
 
     total = sum(c["duration_sec"] or 0 for c in clips)

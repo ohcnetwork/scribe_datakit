@@ -3,17 +3,34 @@ import doc from './data.json'   // metadata baked into the bundle at build time 
 
 // The site is static and credential-free: base facts are baked in at build time
 // (no runtime metadata fetch, no GCS hit per render); audio/peaks come from the
-// public bucket via asset(). User edits (transcript / status / category) live in
+// public bucket via asset(). User edits (final text / languages / status) live in
 // localStorage, merged on top, then exported as a corrections file to submit as a PR.
-const LS_KEY = 'scribe-edits-v1'
-const EXPECTED_SCHEMA = 1   // keep in sync with build_metadata.SCHEMA_VERSION
+const LS_KEY = 'scribe-edits-v2'
+const OLD_LS_KEY = 'scribe-edits-v1'
+const EXPECTED_SCHEMA = 2   // keep in sync with build_metadata.SCHEMA_VERSION
 const Ctx = createContext(null)
 
 if (doc.schema_version !== EXPECTED_SCHEMA)
   console.warn(`metadata schema_version ${doc.schema_version} != expected ${EXPECTED_SCHEMA} — fields may be missing`)
 
+// v1 edits are converted, not dropped: they may be unexported work. The v1 key is
+// left in place as a safety copy.
+const OLD_STATUS = { unverified: 'pending', verified: 'reviewed', flagged: 'flagged' }
+export function convertV1Edits(old) {
+  return Object.fromEntries(Object.entries(old).map(([id, { transcript, status, ...rest }]) => {
+    const e = { ...rest }
+    if (transcript !== undefined) e.final_transcript = transcript
+    if (status) e.status = OLD_STATUS[status] || 'pending'
+    return [id, e]
+  }))
+}
+
 function loadEdits() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {} } catch { return {} }
+  try {
+    const cur = localStorage.getItem(LS_KEY)
+    if (cur) return JSON.parse(cur) || {}
+    return convertV1Edits(JSON.parse(localStorage.getItem(OLD_LS_KEY)) || {})
+  } catch { return {} }
 }
 
 export function StoreProvider({ children }) {
@@ -28,7 +45,7 @@ export function StoreProvider({ children }) {
 
   useEffect(() => { localStorage.setItem(LS_KEY, JSON.stringify(edits)) }, [edits])
 
-  // merge base clip + local edit (edit wins on the three user fields)
+  // merge base clip + local edit (edit wins on the user fields)
   const clips = useMemo(() =>
     doc.clips.map((c) => ({ ...c, ...(edits[c.id] || {}) })), [edits])
 
@@ -65,25 +82,36 @@ export const CATEGORIES = [
   'uncategorized', 'medical-scribe', 'random', 'noisy-background',
   'music', 'silence', 'test',
 ]
-export const STATUSES = ['unverified', 'verified', 'flagged']
+// stored status values, in workflow order. `final` is maintainer-only: merge_corrections
+// drops it from contributor files unless run with --allow-final.
+export const STATUSES = ['pending', 'reviewed', 'qa_complete', 'final', 'flagged']
+export const NEEDS_TEXT = ['reviewed', 'qa_complete', 'final']
+export const LOCKED = ['qa_complete', 'final']
 
-// Derived 4-state workflow. The raw `status` field only records human
-// verification; this folds in whether a machine transcript exists yet, so
-// "never transcribed" and "auto-draft awaiting review" no longer both read as
-// "unverified". Human status (verified/flagged) always wins; otherwise the
-// presence of a transcript decides untranscribed vs needs-review.
+// Display workflow: the stored status, except `pending` splits on whether a machine
+// draft exists, so "never transcribed" and "draft awaiting review" read differently.
 export const WORKFLOW = {
   untranscribed: { label: 'Untranscribed', cls: 'untranscribed', dot: 'var(--status-unverified)' },
   'needs-review': { label: 'Needs review', cls: 'needs-review', dot: 'var(--status-review)' },
-  verified: { label: 'Verified', cls: 'verified', dot: 'var(--status-verified)' },
+  reviewed: { label: 'Reviewed', cls: 'reviewed', dot: 'var(--status-reviewed)' },
+  qa_complete: { label: 'QA complete', cls: 'qa-complete', dot: 'var(--status-qa)' },
+  final: { label: 'Final', cls: 'final', dot: 'var(--status-final)' },
   flagged: { label: 'Flagged', cls: 'flagged', dot: 'var(--status-flagged)' },
 }
-export const WORKFLOW_ORDER = ['untranscribed', 'needs-review', 'verified', 'flagged']
+export const WORKFLOW_ORDER = ['untranscribed', 'needs-review', 'reviewed', 'qa_complete', 'final', 'flagged']
 export function workflowState(c) {
-  if (c.status === 'verified') return 'verified'
-  if (c.status === 'flagged') return 'flagged'
-  return c.transcript ? 'needs-review' : 'untranscribed'
+  if (c.status !== 'pending') return c.status
+  return c.generated_transcript || c.final_transcript ? 'needs-review' : 'untranscribed'
 }
+
+// human-confirmed languages win over Whisper's guess
+export const clipLangs = (c) => c.spoken_languages?.length ? c.spoken_languages
+  : c.whisper_language ? [c.whisper_language] : []
+export const primaryLang = (c) => clipLangs(c)[0] || null
+export const isEnglishOnly = (langs) => langs.length === 1 && langs[0] === 'en'
+// reviewed text when there is one, else the machine draft. Display only: exports keep them apart.
+export const shownTranscript = (c) => c.final_transcript ?? c.generated_transcript ?? ''
+export const shownTranslation = (c) => c.final_translation ?? c.generated_translation ?? ''
 
 export function fmtDur(s) {
   if (s == null) return '—'

@@ -54,21 +54,24 @@ audio are near-instant. `--force` re-transcodes everything.
 `file_name` is HF's magic column — it's cast to the `Audio` feature on load.
 
 ```json
-{"file_name": "0a1b….flac", "transcription": "…", "id": "0a1b…", "language": "en",
+{"file_name": "0a1b….flac", "id": "0a1b…", "collection": "scribe-staging",
+ "whisper_language": "hi", "spoken_languages": null,
+ "generated_transcript": "…", "generated_translation": "…",
+ "final_transcript": null, "final_translation": null,
  "duration_sec": 12.3, "confidence": 0.91, "no_speech_prob": 0.02,
- "status": "unverified", "category": "medical-scribe", "model": "whisper-large-v3",
+ "status": "pending", "category": "medical-scribe", "model": "whisper-large-v3",
  "recorded_at": "2025-…"}
 ```
 
-`transcription` is the human-corrected transcript, falling back to the Whisper output —
-so it is **machine-generated unless `status == "verified"`**. Consumers filter on
-`status` for gold data. (Nothing is verified yet, so `--verified-only` currently exports
-an empty set; it becomes useful once corrections land.)
+`generated_*` is **always machine text** and `final_*` is **always human-reviewed**;
+there is no fallback between them. English-only audio has no translation, so use
+`final_transcript` as its English text. Train on `status == "final"` rows. (Nothing is
+reviewed yet, so `--min-status` currently exports an empty set.)
 
 ### Flags
 
 ```bash
-python3 hf_export.py --verified-only        # only human-verified transcripts
+python3 hf_export.py --min-status final     # reviewed, qa_complete or final; never pending/flagged
 python3 hf_export.py --include-corrupt      # include broken-timestamp clips
 python3 hf_export.py --force                # re-transcode everything
 python3 hf_export.py --license cc0-1.0      # dataset card license (default cc-by-4.0)
@@ -101,7 +104,7 @@ from datasets import load_dataset
 
 ds = load_dataset("gigincg/scribe_dataset", split="train")
 ds[0]["audio"]          # {'array': …, 'sampling_rate': 16000}
-ds[0]["transcription"]
+ds[0]["final_translation"]
 
-gold = ds.filter(lambda r: r["status"] == "verified")
+gold = ds.filter(lambda r: r["status"] == "final")
 ```

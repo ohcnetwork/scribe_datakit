@@ -16,7 +16,7 @@ Needs the audio locally — run `make pull` first. Push with the `hf` CLI, see
 docs/huggingface.md.
 
     python hf_export.py                      # all healthy clips
-    python hf_export.py --verified-only      # only human-verified transcripts
+    python hf_export.py --min-status final   # only clips approved for training
     python hf_export.py --include-corrupt --force
 """
 import argparse, json, os, subprocess, sys
@@ -32,17 +32,20 @@ SR = 16000          # ASR standard; models resample to this regardless
 DUR_TOLERANCE = 1.0  # seconds of slack when checking the transcode against metadata
 
 # columns published to metadata.jsonl; `file_name` is HF's magic column (→ Audio feature)
-COLUMNS = ("id", "language", "duration_sec", "confidence", "no_speech_prob",
+COLUMNS = ("id", "collection", "whisper_language", "spoken_languages",
+           "generated_transcript", "generated_translation", "final_transcript",
+           "final_translation", "duration_sec", "confidence", "no_speech_prob",
            "status", "category", "model", "recorded_at")
+STATUS_RANK = {"reviewed": 1, "qa_complete": 2, "final": 3}   # pending/flagged rank below all
 
 
-def select_clips(clips, verified_only=False, include_corrupt=False):
+def select_clips(clips, min_status=None, include_corrupt=False):
     """Which clips make it into the dataset."""
     out = []
     for c in clips:
         if c.get("corrupt") and not include_corrupt:
             continue
-        if verified_only and c.get("status") != "verified":
+        if min_status and STATUS_RANK.get(c.get("status"), 0) < STATUS_RANK[min_status]:
             continue
         if not c.get("duration_sec"):          # never probed / zero-length
             continue
@@ -52,9 +55,8 @@ def select_clips(clips, verified_only=False, include_corrupt=False):
 
 def row(c):
     """Project a metadata.json clip → an audiofolder metadata.jsonl row."""
-    r = {"file_name": f"{c['id']}.flac",
-         "transcription": c.get("transcript") or c.get("transcript_auto") or ""}
-    r.update({k: c.get(k) for k in COLUMNS})
+    r = {"file_name": f"{c['id']}.flac"}
+    r.update({k: c.get(k) for k in COLUMNS})   # no fallback: machine and human text stay apart
     return r
 
 
@@ -127,18 +129,25 @@ hand; corrections flow through the source project and are re-exported.
 | Field | Meaning |
 |---|---|
 | `audio` | 16 kHz mono FLAC (transcoded from the webm/opus original) |
-| `transcription` | human-corrected transcript, falling back to the Whisper output |
-| `status` | `verified` (human-checked), `flagged`, or `unverified` |
+| `collection` | which collection the clip belongs to |
+| `generated_transcript` | Whisper output in the spoken language; machine text |
+| `generated_translation` | Whisper English translation; machine text, null for English-only audio |
+| `final_transcript` | human-reviewed transcript; null until reviewed |
+| `final_translation` | human-reviewed English translation; null until reviewed |
+| `whisper_language` | Whisper's language guess; unreliable |
+| `spoken_languages` | human-confirmed languages; null until confirmed |
+| `status` | `pending`, `reviewed`, `qa_complete`, `final` (approved for training), or `flagged` |
 | `confidence` | mean `exp(avg_logprob)` over Whisper segments, 0..1 |
 | `no_speech_prob` | mean no-speech probability over segments, 0..1 |
-| `language`, `category`, `duration_sec`, `model`, `recorded_at` | as derived upstream |
+| `category`, `duration_sec`, `model`, `recorded_at` | as derived upstream |
 
-`transcription` is machine-generated unless `status == "verified"`. For gold data,
-filter to verified rows:
+`generated_*` is always machine text and `final_*` is always human-reviewed. English-only
+audio has no translation, so use `final_transcript` as its English text. For training,
+filter to final rows:
 
 ```python
 from datasets import load_dataset
-ds = load_dataset("{repo}", split="train").filter(lambda r: r["status"] == "verified")
+ds = load_dataset("{repo}", split="train").filter(lambda r: r["status"] == "final")
 ```
 
 ## Notes
@@ -149,7 +158,8 @@ duration is verified against the source manifest before publication.
 
 
 def write_card(clips, license_, repo):
-    langs = sorted({c["language"] for c in clips if c.get("language")}) or ["en"]
+    langs = sorted({l for c in clips
+                    for l in c.get("spoken_languages") or [c.get("whisper_language")] if l}) or ["en"]
     hours = sum(c["duration_sec"] for c in clips) / 3600
     n = len(clips)
     size = "n<1K" if n < 1000 else ("1K<n<10K" if n < 10000 else "10K<n<100K")
@@ -162,7 +172,8 @@ def write_card(clips, license_, repo):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--verified-only", action="store_true", help="only status=verified clips")
+    ap.add_argument("--min-status", choices=STATUS_RANK,
+                    help="only clips at this status or later (never pending/flagged)")
     ap.add_argument("--include-corrupt", action="store_true", help="include clips with corrupt timestamps")
     ap.add_argument("--force", action="store_true", help="re-transcode every clip")
     ap.add_argument("--license", default="cc-by-4.0")
@@ -171,7 +182,7 @@ def main():
 
     with open(META) as f:
         clips = json.load(f)["clips"]
-    picked = select_clips(clips, args.verified_only, args.include_corrupt)
+    picked = select_clips(clips, args.min_status, args.include_corrupt)
     print(f"{len(clips)} clips in manifest, exporting {len(picked)}", file=sys.stderr)
 
     os.makedirs(DATA_DIR, exist_ok=True)

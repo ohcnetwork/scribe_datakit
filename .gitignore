@@ -7,6 +7,7 @@ app/public/dataset.zip
 # dataset — synced from the GCS bucket, never committed
 audio/
 metadata.json
+metadata.v1.json
 peaks/
 # generated HuggingFace export (transcoded flac + card); push it with the hf CLI
 hf/
@@ -16,3 +17,6 @@ app/src/data.json
 app/public/audio
 app/public/peaks
 app/public/metadata.json
+metadata.v1.json
+# local planning artifacts
+.hyperclaude/

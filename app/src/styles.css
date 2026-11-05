@@ -28,7 +28,9 @@
   --ring: oklch(0.708 0 0);
   --sidebar: oklch(0.985 0 0);
 
-  --status-verified: oklch(0.62 0.13 155);
+  --status-final: oklch(0.62 0.13 155);
+  --status-qa: oklch(0.60 0.10 200);
+  --status-reviewed: oklch(0.58 0.14 255);
   --status-review: oklch(0.78 0.15 82);
   --status-unverified: oklch(0.68 0 0);
   --status-flagged: oklch(0.577 0.245 27);
@@ -151,8 +153,12 @@ textarea.input { height: auto; min-height: 120px; padding: 11px 12px; line-heigh
 
 .status { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
 .status .dot { width: 7px; height: 7px; border-radius: 50%; }
-.status.verified { background: oklch(0.62 0.13 155 / 0.14); color: oklch(0.42 0.12 155); }
-.status.verified .dot { background: var(--status-verified); }
+.status.final { background: oklch(0.62 0.13 155 / 0.14); color: oklch(0.42 0.12 155); }
+.status.final .dot { background: var(--status-final); }
+.status.qa-complete { background: oklch(0.60 0.10 200 / 0.14); color: oklch(0.42 0.09 200); }
+.status.qa-complete .dot { background: var(--status-qa); }
+.status.reviewed { background: oklch(0.58 0.14 255 / 0.14); color: oklch(0.44 0.14 255); }
+.status.reviewed .dot { background: var(--status-reviewed); }
 .status.needs-review { background: oklch(0.80 0.16 85 / 0.20); color: oklch(0.46 0.12 74); }
 .status.needs-review .dot { background: var(--status-review); }
 .status.flagged { background: oklch(0.577 0.245 27 / 0.14); color: oklch(0.51 0.20 27); }
@@ -160,7 +166,9 @@ textarea.input { height: auto; min-height: 120px; padding: 11px 12px; line-heigh
 .status.untranscribed { background: var(--muted); color: var(--muted-foreground); }
 .status.untranscribed .dot { background: var(--status-unverified); }
 /* the toggle always sets data-theme, so [data-theme=dark] covers system-dark too */
-:root[data-theme="dark"] .status.verified { color: oklch(0.78 0.13 155); }
+:root[data-theme="dark"] .status.final { color: oklch(0.78 0.13 155); }
+:root[data-theme="dark"] .status.qa-complete { color: oklch(0.78 0.09 200); }
+:root[data-theme="dark"] .status.reviewed { color: oklch(0.78 0.11 255); }
 :root[data-theme="dark"] .status.needs-review { color: oklch(0.84 0.15 85); }
 :root[data-theme="dark"] .status.flagged { color: oklch(0.74 0.19 27); }
 
@@ -204,7 +212,7 @@ textarea.input { height: auto; min-height: 120px; padding: 11px 12px; line-heigh
 .meta-cell .k { font-size: 12px; color: var(--muted-foreground); font-weight: 500; }
 .meta-cell .v { font-size: 14px; font-weight: 500; margin-top: 3px; }
 .transcript-card { padding: 20px; }
-.transcript-card .lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); }
+.lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); }
 .transcript-text { font-size: 18px; line-height: 1.55; margin: 10px 0 0; }
 
 .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--primary);

@@ -59,33 +59,32 @@ transcription job; **user** are editable in the app.
 | `recorded_at` | derived | ISO ts parsed from filename |
 | `corrupt` | derived | true = timestamp-damaged; badge + filter |
 | `tags` | derived | container tags, e.g. `{encoder: "Chrome"}` — capture provenance |
-| `language` | model | Whisper-detected (e.g. `en`, `hi`); null until transcribed |
-| `transcript` | model → user | auto text, then human-corrected |
-| `model` | model | e.g. `whisper-large-v3`; provenance of the transcript |
-| `status` | user | `unverified` → `verified` (see §5) |
+| `collection` | derived | which collection the clip belongs to; set when the clip is added |
+| `whisper_language` | model | Whisper's guess (e.g. `en`, `hi`); unreliable; null until transcribed |
+| `spoken_languages` | user | human-confirmed list, e.g. `["ml", "en"]`; null until confirmed, and wins over `whisper_language` |
+| `generated_transcript` | model | Whisper output in the spoken language; never edited |
+| `generated_translation` | model | Whisper English translation; never edited; null for English-only audio |
+| `final_transcript` | user | human-reviewed transcript; null until a person reviews it |
+| `final_translation` | user | human-reviewed English translation; null until a person reviews it |
+| `model` | model | e.g. `whisper-large-v3`; provenance of the generated text |
+| `status` | user | `pending` → `reviewed` → `qa_complete` → `final`, or `flagged` (see §5) |
 | `category` | user | see §4 |
 
 Top-level doc also carries `clip_count` and `total_duration_sec` for the dataset
-page headline. Planned additions are tracked as tasks (`transcript_auto` +
-correction split, Whisper `confidence`/`no_speech_prob`, `schema_version`).
+page headline, and `schema_version` (2).
 
-## 4. Categories (the three browse axes)
+## 4. Categories (the browse axes)
 
-Three independent facets, all filterable and combinable:
+Four independent facets, all filterable and combinable:
 
-1. **Language** — from Whisper detection. Values emerge from the data
-   (English, Hindi, mixed, …). Not a fixed list.
-2. **Workflow status** — a **derived** 4-state facet, not the raw `status` field.
-   The stored `status` only records human verification (`unverified` / `verified`
-   / `flagged`); on its own it can't tell a never-transcribed clip apart from an
-   auto-draft awaiting review — both are `unverified`. The UI derives:
-   - no transcript → **Untranscribed**
-   - transcript + `unverified` → **Needs review**
-   - `verified` → **Verified**
-   - `flagged` → **Flagged**
-   `status` stays the human axis; the Browse badge, status filter, and Categories
-   cards render this derived state (`workflowState()` in `store.jsx`).
-3. **Category** — content type. Fixed, small, sensible set:
+1. **Collection** — the source batch of the clip.
+2. **Language** — `spoken_languages` when confirmed, otherwise Whisper's guess. Values
+   emerge from the data. Not a fixed list. A code-mixed clip appears under each language.
+3. **Workflow status** — the stored `status`, except that `pending` displays as
+   **Untranscribed** (no text yet) or **Needs review** (a machine draft exists). The
+   Browse badge, status filter, and Categories cards render this state
+   (`workflowState()` in `store.jsx`).
+4. **Category** — content type. Fixed, small, sensible set:
    `medical-scribe`, `random`, `noisy-background`, `music`, `silence`,
    `test`, `uncategorized` (default). Keep it short; add only when a real
    cluster appears.
@@ -95,12 +94,26 @@ Category and status are editable inline (they're `user` fields).
 
 ## 5. Verification flow
 
-Transcripts are machine-generated and wrong often enough that correction is the
-core loop:
+Machine text is wrong often enough that review is the core loop. `generated_*` is
+always machine text and `final_*` is always human-reviewed, so the two never blur.
 
-1. Clip arrives `unverified` with auto-transcript + detected language.
-2. Volunteer listens, edits the transcript text, optionally fixes category.
-3. Marks `verified`.
+| Status | Meaning | Set by |
+|---|---|---|
+| `pending` | No human review is complete | Default |
+| `reviewed` | A reviewer finished the clip, with at least one `final_*` filled | Reviewer |
+| `qa_complete` | A second person checked it | QA reviewer |
+| `final` | Approved for training | Maintainer only |
+| `flagged` | Has a problem and needs a decision; excluded from training | Anyone |
+
+1. Clip arrives `pending` with generated text.
+2. Reviewer listens, confirms the languages, then edits or accepts each text box. A box
+   left untouched stays null, so English-only annotation doesn't save the machine draft
+   as human text.
+3. Reviewer marks it `reviewed`. QA is optional, because reviewer numbers vary, so a
+   maintainer can move `reviewed` straight to `final`.
+
+Changing text on a `qa_complete` or `final` clip moves it back to `reviewed`.
+English-only audio needs no translation; its English text is `final_transcript`.
 
 **Persistence constraint (drives architecture):** the app is a static site over
 `audio/` + `metadata.json`. There is no server. Edits therefore save to the

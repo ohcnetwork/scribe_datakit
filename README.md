@@ -17,15 +17,16 @@ public GCS bucket (git-ignored locally); the repo holds only code. See
 | `metadata.json` | one record per clip — the app's data — **on the bucket, git-ignored** |
 | `peaks/` | precomputed waveform peaks — **on the bucket, git-ignored** |
 | `build_metadata.py` | incremental ffprobe scan → `metadata.json` (all derivable fields + corruption flag) |
-| `transcribe.py` | batch Whisper large-v3 → transcript (+auto), language, confidence, resumable |
+| `transcribe.py` | batch Whisper large-v3 → generated transcript and translation, language, confidence, resumable |
 | `extract_peaks.py` | ffmpeg → `peaks/<id>.json` per clip, for the app's waveform |
 | `make_release.sh` | zip `audio/` + `metadata.json` → `app/public/dataset.zip` |
-| `merge_corrections.py` | apply `corrections/*.json` onto `metadata.json` |
+| `merge_corrections.py` | apply `corrections/*.json` onto `metadata.json`, enforcing the status rules |
+| `migrate_schema_v2.py` | one-off: migrate `metadata.json` from schema v1 to v2 (keeps a `metadata.v1.json` backup) |
 | `hf_export.py` | corpus → HuggingFace `audiofolder` dataset in `hf/` (see [docs/huggingface.md](docs/huggingface.md)) |
 | `corrections/` | contributor correction files, submitted as PRs (the only dataset data in git) |
 | `Makefile` | `pull` / `push` / `release` / `apply-corrections` — sync the dataset with the bucket |
 | `.env.example` | bucket config (`GCS_BUCKET`, `PUBLIC_BASE`) — copy to `.env` |
-| `test_metadata.py`, `test_merge_corrections.py` | regression checks |
+| `test_*.py` | regression checks |
 | `requirements.txt` | Python deps for `transcribe.py` |
 | `app/` | React (Vite) browser UI |
 
@@ -70,7 +71,8 @@ python3 test_metadata.py            # regression check
 **Incremental by default** — ffmpeg touches each file once, ever. A clip already
 in `metadata.json` is reused untouched; only new files (or ones missing a derived
 field) are probed, so adding audio and re-running is near-instant. User edits
-(transcript, language, model, status, category) are always preserved. Derives
+(final text, spoken languages, status, category, collection) are always preserved.
+New clips go into the collection named by `--collection` (default `scribe-staging`). Derives
 container, codec, sample rate, channels, channel layout, bitrate, duration,
 corruption flag, recorded-at, and container tags.
 
@@ -79,10 +81,14 @@ corruption flag, recorded-at, and container tags.
 ```bash
 pip install -r requirements.txt   # Apple Silicon (mlx-whisper); ~3 GB model on first run
 python3 transcribe.py             # or --limit N to smoke-test
+python3 transcribe.py --translate # English translations, after transcribing
 ```
-Writes after each clip, so it's Ctrl-C-safe and resumable. Fills `transcript_auto`
-(immutable model output), `transcript` (human-editable copy), `confidence`,
-`no_speech_prob`, `language`, `model`, and auto-tags silent clips `category=silence`.
+Writes after each clip, so it's Ctrl-C-safe and resumable. Fills `generated_transcript`
+(immutable model output), `confidence`, `no_speech_prob`, `whisper_language`, `model`,
+and auto-tags silent clips `category=silence`. `--translate` fills
+`generated_translation` for clips with speech, skipping English-only audio. It uses
+`spoken_languages` when set, otherwise Whisper's guess, so re-run it after a reviewer
+corrects a clip that was wrongly detected as English. Neither pass writes `final_*`.
 On CUDA, swap the transcribe call for faster-whisper (same loop).
 
 ## Waveform peaks
@@ -99,13 +105,16 @@ served locally in dev via the `app/public/peaks` symlink from `make pull`.
 
 The site is static and has no server, so corrections travel through git:
 
-1. Edit transcripts/categories/status in the app → **Contribute / Export** →
-   `corrections.json`.
+1. Review clips in the app → **Contribute / Export** → `corrections.json`.
 2. Add it to the repo as `corrections/<your-handle>.json` and open a PR (see
    [`corrections/README.md`](corrections/README.md)). This is the only dataset
    data that lives in git.
 3. A maintainer runs `make apply-corrections` (merges onto `metadata.json`),
    reviews the diff, then `make push` to publish — and clears the merged files.
+
+Only a maintainer can approve a clip for training: `status: final` is dropped unless
+`python3 merge_corrections.py --allow-final <your-file>.json` is used. Never pass that
+flag for contributor files.
 
 ## Data & GCS
 
