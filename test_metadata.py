@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(__file__)
 META = os.path.join(HERE, "metadata.json")
 AUDIO_DIR = os.path.join(HERE, "audio")
-OPUS_FRAME_SEC = 0.06
 STATUSES = ("pending", "reviewed", "qa_complete", "final", "flagged")
 
 
@@ -33,12 +32,12 @@ def check_against_audio(clips):
         return
 
     def coded(c):
-        n = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-count_packets",
-             "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0",
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "packet=duration_time", "-of", "csv=p=0",
              os.path.join(AUDIO_DIR, c["filename"])],
-            capture_output=True, text=True).stdout.strip()
-        return c, (int(n) * OPUS_FRAME_SEC if n.isdigit() else None)
+            capture_output=True, text=True).stdout
+        return c, sum(float(l.strip().strip(",")) for l in out.splitlines() if l.strip(" ,")) or None
 
     opus = [c for c in clips if c.get("codec") == "opus"]
     bad = []
@@ -65,15 +64,16 @@ def main():
         if dur:
             kbps = c["size_bytes"] * 8 / dur / 1000
             assert kbps >= 1, f"{c['filename']}: {kbps:.2f} kbps — corruption not corrected"
-        assert set(("id", "whisper_language", "spoken_languages", "collection",
-                    "generated_transcript", "generated_translation", "final_transcript",
-                    "final_translation", "confidence", "no_speech_prob", "model", "status",
-                    "category", "container", "codec", "channels", "bitrate_kbps",
-                    "tags")) <= c.keys()
+        assert set(("id", "whisper_language", "spoken_languages", "collection", "segments",
+                    "model", "status", "category", "container", "codec", "channels",
+                    "bitrate_kbps", "tags")) <= c.keys()
         assert c["status"] in STATUSES, f"{c['filename']}: bad status {c['status']!r}"
         if c["status"] in ("reviewed", "qa_complete", "final"):
-            assert c["final_transcript"] is not None or c["final_translation"] is not None, \
-                f"{c['filename']}: {c['status']} with no human text"
+            assert all(s["excluded"] or s["final_transcript"] or s["final_translation"]
+                       for s in c["segments"]), f"{c['filename']}: {c['status']} missing human text"
+        for a, b in zip(c["segments"], c["segments"][1:]):
+            assert a["end"] == b["start"], f"{c['filename']}: segments don't join up"
+        assert all(s["end"] - s["start"] <= 28.01 for s in c["segments"]), c["filename"]
 
     total = sum(c["duration_sec"] for c in clips)
     assert abs(total - d["total_duration_sec"]) < 1, "total_duration_sec mismatch"

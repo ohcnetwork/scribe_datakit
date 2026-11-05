@@ -1,69 +1,99 @@
 #!/usr/bin/env python3
-"""Batch-transcribe the collection with Whisper large-v3, resumable.
+"""Run Whisper large-v3 over every segment, both tasks, resumable.
 
-For every clip not yet processed (no `model`), fills: `generated_transcript`
-(immutable model output), `confidence` (0..1), `no_speech_prob` (0..1),
-`whisper_language`, `model`; and auto-tags `category="silence"` for empty/no-speech
-clips. Never writes `final_*`: those hold human-reviewed text only.
+Per segment fills `generated_transcript` (task=transcribe) and `generated_translation`
+(task=translate, X→English), plus `whisper_language`, `confidence` and `no_speech_prob`.
+Never writes `final_*`: those hold human-reviewed text only. Run segment_audio.py first.
 
-`--translate` is a separate pass that fills `generated_translation` (Whisper
-task=translate, X→English) for transcribed clips that aren't English-only. Safe to
-Ctrl-C and re-run: both passes write after each clip and skip finished ones.
+Translation runs on everything with speech, including clips Whisper calls English,
+because its language guess is unreliable. Only human-confirmed English is skipped.
 
-Backend: mlx-whisper (Apple-Silicon native, fast). On CUDA, swap the transcribe
-call for faster-whisper — same loop, same fields.
-    pip install mlx-whisper
-Model is downloaded once from HuggingFace (~3 GB) on first run.
+Safe to Ctrl-C and re-run: it writes after each clip and skips finished segments.
+Backend: mlx-whisper (Apple Silicon). On CUDA, swap whisper_run for faster-whisper.
 
-Audio is pre-decoded with ffmpeg to 16 kHz mono wav, capped at the known duration
-so the ~7% timestamp-corrupt clips can't expand into hours of gap-filled silence.
-
-Usage:
-    python transcribe.py            # transcribe all remaining
-    python transcribe.py --limit 5  # do 5 (smoke test)
-    python transcribe.py --translate --limit 5
+    python transcribe.py            # all remaining
+    python transcribe.py --limit 5  # 5 clips (smoke test)
 """
-import argparse, json, math, os, subprocess, sys, tempfile
+import argparse, collections, json, math, os, subprocess, sys, time
 
 HERE = os.path.dirname(__file__)
-AUDIO_DIR = os.path.join(HERE, "audio")
+FLAC_DIR = os.path.join(HERE, "flac")
 META = os.path.join(HERE, "metadata.json")
 MODEL = os.environ.get("WHISPER_MODEL", "mlx-community/whisper-large-v3-mlx")
 MODEL_NAME = "whisper-large-v3"
+SR = 16000
 SILENCE_NSP = 0.6   # ponytail: mean no_speech_prob over this auto-tags 'silence'
 
 
-def decode_16k(path, duration_sec):
-    """webm/opus → 16 kHz mono wav, capped so corrupt clips stay bounded."""
-    wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
-    cap = (duration_sec + 2) if duration_sec else 3600
-    # capture stderr instead of inheriting it: the ~7% corrupt clips spew
-    # "File ended prematurely"/"Error parsing Opus packet header" but ffmpeg still
-    # exits 0 and decodes fine. Only surface stderr when ffmpeg truly fails.
-    p = subprocess.run(
-        ["ffmpeg", "-v", "error", "-err_detect", "ignore_err", "-t", str(cap),
-         "-i", path, "-ac", "1", "-ar", "16000", "-y", wav],
-        capture_output=True, text=True, timeout=1200)
-    if p.returncode != 0:
-        tail = (p.stderr or "").strip().splitlines()
-        raise RuntimeError(tail[-1] if tail else f"ffmpeg exit {p.returncode}")
-    return wav
+def confirmed_english(c):
+    return c.get("spoken_languages") == ["en"]
 
 
-def clip_languages(c):
-    """Human-confirmed languages win over Whisper's guess."""
-    return c.get("spoken_languages") or [c.get("whisper_language")]
+def needs_transcript(s):
+    return s["generated_transcript"] is None
 
 
-def needs_translation(c):
-    """Transcribed, has speech, not yet translated, and not English-only."""
-    return (c.get("generated_translation") is None and bool(c.get("generated_transcript"))
-            and clip_languages(c) != ["en"])
+def needs_translation(c, s):
+    """Has speech, not translated yet, and not confirmed English by a person."""
+    return s["generated_translation"] is None and bool(s["generated_transcript"]) \
+        and not confirmed_english(c)
 
 
 def source_language(c):
-    """Language token for task=translate: the first non-English language of the clip."""
-    return next((l for l in clip_languages(c) if l and l != "en"), None)
+    """Language token when a person confirmed one, else None so Whisper detects it."""
+    return next((l for l in c.get("spoken_languages") or [] if l != "en"), None)
+
+
+def majority_language(segments):
+    """The language covering the most audio, by Whisper's per-segment guess."""
+    t = collections.Counter()
+    for s in segments:
+        if s["whisper_language"] and s["generated_transcript"]:
+            t[s["whisper_language"]] += s["end"] - s["start"]
+    return t.most_common(1)[0][0] if t else None
+
+
+def is_silent(segments):
+    nsp = [s["no_speech_prob"] for s in segments if s["no_speech_prob"] is not None]
+    return bool(nsp) and not any(s["generated_transcript"] for s in segments) \
+        and sum(nsp) / len(nsp) >= SILENCE_NSP
+
+
+def load_audio(clip_id):
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", os.path.join(FLAC_DIR, f"{clip_id}.flac"),
+                          "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+                         capture_output=True, check=True, timeout=600).stdout
+    return np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0
+
+
+def stats(r):
+    """Mean confidence and no-speech probability; Whisper can emit NaN on garbage audio."""
+    fin = lambda xs: [x for x in xs if isinstance(x, (int, float)) and math.isfinite(x)]
+    segs = r.get("segments") or []
+    lp = fin(s.get("avg_logprob") for s in segs)
+    nsp = fin(s.get("no_speech_prob") for s in segs)
+    return (round(math.exp(sum(lp) / len(lp)), 3) if lp else None,
+            round(sum(nsp) / len(nsp), 3) if nsp else None)
+
+
+def process(c, whisper_run):
+    audio = load_audio(c["id"])
+    for s in c["segments"]:
+        chunk = audio[int(s["start"] * SR):int(s["end"] * SR)]
+        if needs_transcript(s):
+            r = whisper_run(chunk, task="transcribe", language=source_language(c))
+            s["generated_transcript"] = (r.get("text") or "").strip()
+            s["whisper_language"] = r.get("language")
+            s["confidence"], s["no_speech_prob"] = stats(r)
+        if needs_translation(c, s):
+            r = whisper_run(chunk, task="translate",
+                            language=source_language(c) or s["whisper_language"])
+            s["generated_translation"] = (r.get("text") or "").strip()
+    c["model"] = MODEL_NAME
+    c["whisper_language"] = majority_language(c["segments"])
+    if is_silent(c["segments"]):
+        c["category"] = "silence"
 
 
 def save(doc):
@@ -71,101 +101,47 @@ def save(doc):
     tmp = META + ".tmp"
     with open(tmp, "w") as f:
         json.dump(doc, f, indent=2)
-    os.replace(tmp, META)                       # write-after-each = resumable
-
-
-def translate_all(doc, mlx_whisper, limit):
-    todo = [c for c in doc["clips"] if needs_translation(c)]
-    if limit:
-        todo = todo[:limit]
-    print(f"{len(todo)} clip(s) to translate with {MODEL_NAME}", file=sys.stderr)
-    done = fails = 0
-    for c in todo:
-        wav = None
-        try:
-            wav = decode_16k(os.path.join(AUDIO_DIR, c["filename"]), c.get("duration_sec"))
-            r = mlx_whisper.transcribe(wav, path_or_hf_repo=MODEL, task="translate",
-                                       language=source_language(c))
-            c["generated_translation"] = (r.get("text") or "").strip()
-        except Exception as e:
-            fails += 1
-            print(f"  ✗ FAIL  {c['filename']}: {e}", file=sys.stderr)
-            continue
-        finally:
-            if wav and os.path.exists(wav):
-                os.remove(wav)
-        done += 1
-        save(doc)
-        print(f"  ✓ [{done}/{len(todo)}] {source_language(c)} {c['filename']}: "
-              f"{c['generated_translation'][:50]!r}", file=sys.stderr)
-    print(f"done: {done} translated, {fails} failed / {len(todo)} total", file=sys.stderr)
+    os.replace(tmp, META)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="max clips this run (0 = all)")
-    ap.add_argument("--translate", action="store_true",
-                    help="fill generated_translation instead of transcribing")
     args = ap.parse_args()
-
     try:
         import mlx_whisper
     except ImportError:
-        sys.exit("mlx-whisper not installed. Run: pip install mlx-whisper")
+        sys.exit("mlx-whisper not installed. Run: pip install -r requirements.txt")
 
-    doc = json.load(open(META))
+    with open(META) as f:
+        doc = json.load(f)
     if doc.get("schema_version") != 2:
         sys.exit("metadata.json is not schema v2; run migrate_schema_v2.py first")
-    if args.translate:
-        return translate_all(doc, mlx_whisper, args.limit)
-    clips = doc["clips"]
-    # key resumability on `model`, not the text: a silent clip transcribes to
-    # an empty string, which must not look "not done" and re-run every time.
-    todo = [c for c in clips if not c.get("model")]
+    todo = [c for c in doc["clips"]
+            if any(needs_transcript(s) or needs_translation(c, s) for s in c["segments"])]
     if args.limit:
         todo = todo[:args.limit]
-    print(f"{len(todo)} clip(s) to transcribe with {MODEL_NAME}", file=sys.stderr)
+    print(f"{len(todo)} clip(s) to process with {MODEL_NAME}", file=sys.stderr)
 
-    done = fails = 0
+    def whisper_run(chunk, **kw):
+        return mlx_whisper.transcribe(chunk, path_or_hf_repo=MODEL, **kw)
+
+    done = fails = audio_sec = 0
+    began = time.time()
     for c in todo:
-        path = os.path.join(AUDIO_DIR, c["filename"])
-        wav = None
         try:
-            wav = decode_16k(path, c.get("duration_sec"))
-            r = mlx_whisper.transcribe(wav, path_or_hf_repo=MODEL)
-            text = (r.get("text") or "").strip()
-            segs = r.get("segments") or []
-            # Whisper can return non-finite avg_logprob/no_speech_prob on garbage
-            # audio; filter them so we never emit NaN (Python json writes NaN
-            # literally, which is valid to json.load but breaks browser JSON.parse).
-            fin = lambda xs: [x for x in xs if isinstance(x, (int, float)) and math.isfinite(x)]
-            lp = fin(s.get("avg_logprob") for s in segs)
-            nsp = fin(s.get("no_speech_prob") for s in segs)
-            confidence = round(math.exp(sum(lp) / len(lp)), 3) if lp else None
-            no_speech = round(sum(nsp) / len(nsp), 3) if nsp else None
-
-            c["generated_transcript"] = text
-            c["confidence"] = confidence
-            c["no_speech_prob"] = no_speech
-            c["whisper_language"] = r.get("language")
-            c["model"] = MODEL_NAME
-            if no_speech is not None and no_speech >= SILENCE_NSP and not text:
-                c["category"] = "silence"    # auto-triage empty/no-speech clips
+            process(c, whisper_run)
         except Exception as e:
             fails += 1
-            print(f"  ✗ FAIL  {c['filename']}: {e}", file=sys.stderr)
+            print(f"  ✗ FAIL  {c['id']}: {e}", file=sys.stderr)
             continue
-        finally:
-            if wav and os.path.exists(wav):
-                os.remove(wav)
-
-        done += 1
         save(doc)
-        tag = f" [{c['category']}]" if c.get("category") == "silence" else ""
-        print(f"  ✓ [{done}/{len(todo)}] {c['whisper_language']} conf={c['confidence']}"
-              f"{tag} {c['filename']}: {c['generated_transcript'][:50]!r}", file=sys.stderr)
-
-    print(f"done: {done} transcribed, {fails} failed / {len(todo)} total", file=sys.stderr)
+        done += 1
+        audio_sec += c["duration_sec"] or 0
+        print(f"  ✓ [{done}/{len(todo)}] {c['id'][:8]} {c['whisper_language']} "
+              f"{len(c['segments'])} seg, {audio_sec / (time.time() - began):.2f}x realtime",
+              file=sys.stderr, flush=True)
+    print(f"done: {done} processed, {fails} failed / {len(todo)} total", file=sys.stderr)
 
 
 if __name__ == "__main__":

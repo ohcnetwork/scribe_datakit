@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """One-off: migrate metadata.json from schema v1 to v2.
 
-Separates machine output (generated_*) from human text (final_*). In v1 `transcript`
-started as a copy of the Whisper output, so it only becomes final_transcript when a
-person actually touched it (status=verified, or it differs from the Whisper text).
-
-Writes metadata.v1.json as a backup first; refuses to run twice.
+v2 keeps each recording whole and hangs its text on `segments` (see segment_audio.py).
+Whisper text is regenerated per segment, so v1's transcripts are not carried over;
+they stay in the metadata.v1.json backup. Refuses to run if any v1 clip holds human
+work, because that text has no segment to go to.
 
     python migrate_schema_v2.py
     python migrate_schema_v2.py --collection scribe-staging
@@ -15,35 +14,25 @@ import argparse, json, os, shutil, sys
 HERE = os.path.dirname(__file__)
 META = os.path.join(HERE, "metadata.json")
 BACKUP = os.path.join(HERE, "metadata.v1.json")
-STATUS_MAP = {"unverified": "pending", "verified": "reviewed", "flagged": "flagged"}
-
-
-def migrate_clip(c, collection):
-    auto, cur = c.pop("transcript_auto", None), c.pop("transcript", None)
-    old = c.get("status", "unverified")
-    if old not in STATUS_MAP:
-        raise ValueError(f"{c.get('id')}: unknown status {old!r}")
-    if auto is None and old != "verified":
-        auto = cur                      # pre-split record: the lone transcript was machine output
-    human = old == "verified" or (cur is not None and cur != auto)
-
-    c["whisper_language"] = c.pop("language", None)
-    c["spoken_languages"] = None        # null = no human has confirmed the language yet
-    c["collection"] = collection
-    c["generated_transcript"] = auto
-    c["generated_translation"] = None
-    c["final_transcript"] = cur if human else None
-    c["final_translation"] = None
-    status = STATUS_MAP[old]
-    c["status"] = "pending" if status == "reviewed" and c["final_transcript"] is None else status
-    return c
+DROP = ("transcript", "transcript_auto", "confidence", "no_speech_prob")
 
 
 def migrate(doc, collection):
     if doc.get("schema_version") != 1:
         raise ValueError(f"expected schema_version 1, got {doc.get('schema_version')}")
+    human = [c["id"] for c in doc["clips"] if c.get("status", "unverified") != "unverified"
+             or c.get("transcript") != c.get("transcript_auto")]
+    if human:
+        raise ValueError(f"{len(human)} clip(s) hold human work, e.g. {human[0]}")
     for c in doc["clips"]:
-        migrate_clip(c, collection)
+        for k in DROP:
+            c.pop(k, None)
+        c["whisper_language"] = c.pop("language", None)
+        c["spoken_languages"] = None     # null = no human has confirmed the language yet
+        c["collection"] = collection
+        c["segments"] = []
+        c["status"] = "pending"
+        c["reviewed_by"] = c["qa_by"] = None
     doc["schema_version"] = 2
     return doc
 
@@ -64,9 +53,7 @@ def main():
     with open(tmp, "w") as f:
         json.dump(doc, f, indent=2)
     os.replace(tmp, META)
-    kept = sum(c["final_transcript"] is not None for c in doc["clips"])
-    print(f"migrated {len(doc['clips'])} clips ({kept} with human text) → {META}; "
-          f"backup: {BACKUP}", file=sys.stderr)
+    print(f"migrated {len(doc['clips'])} clips → {META}; backup: {BACKUP}", file=sys.stderr)
 
 
 if __name__ == "__main__":

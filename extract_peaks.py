@@ -22,7 +22,7 @@ import audioop
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(__file__)
-AUDIO_DIR = os.path.join(HERE, "audio")
+FLAC_DIR = os.path.join(HERE, "flac")
 META = os.path.join(HERE, "metadata.json")
 OUT_DIR = os.path.join(HERE, "peaks")
 N_PEAKS = 800          # horizontal resolution of the rendered waveform
@@ -30,7 +30,7 @@ SR = 8000              # decode rate — plenty for an amplitude envelope
 
 
 def extract(clip):
-    path = os.path.join(AUDIO_DIR, clip["filename"])
+    path = os.path.join(FLAC_DIR, f"{clip['id']}.flac")   # what reviewers hear
     dur = clip.get("duration_sec")
     cap = (dur + 2) if dur else 3600           # bound the ~7% timestamp-corrupt clips
     try:

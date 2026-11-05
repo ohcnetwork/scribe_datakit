@@ -12,7 +12,7 @@ channel layout, bitrate, duration, corruption flag, and container tags. Duration
 computed defensively — these webm files carry no duration header and ~7% have
 corrupt timestamps that gap-fill silence to 24h+; see compute_duration().
 
-User-owned fields (final_*, spoken_languages, status, category, collection) are always
+User-owned fields (segments, spoken_languages, status, category, collection) are always
 preserved across runs. ffmpeg + ffprobe must be on PATH.
 
     python build_metadata.py            # incremental
@@ -29,14 +29,11 @@ EXTS = (".webm", ".mp4", ".ogg", ".mp3", ".wav", ".m4a")
 SCHEMA_VERSION = 2   # bump when the clip/doc shape changes; the app warns on mismatch
 
 # fields owned by the user / transcription job — never overwritten by a re-probe
-KEEP = ("generated_transcript", "generated_translation", "final_transcript",
-        "final_translation", "confidence", "no_speech_prob", "whisper_language",
-        "spoken_languages", "model", "status", "category", "collection")
+KEEP = ("segments", "whisper_language", "spoken_languages", "model", "status",
+        "category", "collection", "reviewed_by", "qa_by")
 MODEL_USER_DEFAULTS = {
-    "generated_transcript": None, "generated_translation": None,
-    "final_transcript": None, "final_translation": None, "confidence": None,
-    "no_speech_prob": None, "whisper_language": None, "spoken_languages": None,
-    "model": None, "status": "pending", "category": "uncategorized",
+    "segments": [], "whisper_language": None, "spoken_languages": None, "model": None,
+    "status": "pending", "category": "uncategorized", "reviewed_by": None, "qa_by": None,
 }
 # derived fields; if any is missing on a cached record we re-probe it (auto-migrate)
 DERIVED = ("container", "codec", "codec_long", "sample_rate", "channels",
@@ -59,17 +56,16 @@ def ffprobe_json(path):
     return fmt, astream
 
 
-OPUS_FRAME_SEC = 0.06   # these files are 60 ms/packet — validated against every healthy clip
-
-
-def opus_packets(path):
-    """Coded frame count for the audio stream, or None."""
+def coded_duration(path):
+    """Sum of the audio packet durations, or None. Packet size varies between clips
+    (20 ms and 60 ms both occur), so read it rather than assuming one."""
     try:
-        n = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-count_packets",
-             "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", path],
-            capture_output=True, text=True, timeout=300).stdout.strip()
-        return int(n) if n.isdigit() else None
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "packet=duration_time", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=300).stdout
+        total = sum(float(l.strip().strip(",")) for l in out.splitlines() if l.strip(" ,"))
+        return round(total, 2) or None
     except Exception:
         return None
 
@@ -102,9 +98,8 @@ def compute_duration(path, codec):
         pass
 
     if codec == "opus":
-        n = opus_packets(path)
-        if n:
-            coded = round(n * OPUS_FRAME_SEC, 2)
+        coded = coded_duration(path)
+        if coded:
             corrupt = decoded is None or abs(decoded - coded) > max(1.0, 0.05 * coded)
             return coded, corrupt
     return decoded, False
@@ -146,17 +141,14 @@ def probe(fname):
         "corrupt": corrupt,
         "recorded_at": recorded_at,
         "tags": tags,
-        "whisper_language": None,        # Whisper's guess; unreliable, never hand-edited
-        "spoken_languages": None,        # human-confirmed list, e.g. ["ml", "en"]; null = unconfirmed
-        "generated_transcript": None,    # immutable Whisper output (transcribe.py)
-        "generated_translation": None,   # immutable Whisper task=translate output
-        "final_transcript": None,        # human-reviewed; null until a person reviews it
-        "final_translation": None,       # human-reviewed; null until a person reviews it
-        "confidence": None,         # 0..1, mean exp(avg_logprob) over segments
-        "no_speech_prob": None,     # 0..1, mean over segments
+        "whisper_language": None,   # Whisper's guess, by audio covered; unreliable
+        "spoken_languages": None,   # human-confirmed list, e.g. ["ml", "en"]; null = unconfirmed
+        "segments": [],             # time ranges holding the text (segment_audio.py)
         "model": None,
         "status": "pending",
         "category": "uncategorized",
+        "reviewed_by": None,
+        "qa_by": None,
     }
 
 

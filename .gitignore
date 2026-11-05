@@ -8,14 +8,12 @@ audio/
 metadata.json
 metadata.v1.json
 peaks/
+flac/
 # generated HuggingFace export (transcoded flac + card); push it with the hf CLI
 hf/
-# metadata baked into the bundle at build time
-app/src/data.json
-# dev-only symlinks created by `make link`
-app/public/audio
-app/public/peaks
-app/public/metadata.json
 metadata.v1.json
 # local planning artifacts
 .hyperclaude/
+# review tool
+.venv/
+review_work/
