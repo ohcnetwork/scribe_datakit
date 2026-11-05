@@ -1,21 +1,24 @@
-# Local dataset tasks. audio/, peaks/ and metadata.json are git-ignored.
+# Reviewers only need `make review`. The rest is for the maintainer.
 HF_REPO ?= ohcnetwork/scribe_dataset
 
-.PHONY: link apply-corrections hf-export
+.PHONY: setup review test hf-export
 
-# Serve local audio and peaks through the dev server.
-link:
-	@ln -sfn ../../audio app/public/audio
-	@ln -sfn ../../peaks app/public/peaks
-	@echo "linked app/public/{audio,peaks}"
+# One-time setup: Python and Node dependencies.
+setup:
+	python3 -m venv .venv
+	.venv/bin/pip install --quiet -r requirements-review.txt
+	cd app && npm ci --silent
 
-# Apply contributor corrections onto local metadata.json, then review the diff.
-apply-corrections:
-	python3 merge_corrections.py
-	@echo "merged: review the diff, then re-export with: make hf-export"
+# Build the app and open it. Your work is kept in review_work/.
+review:
+	@test -d .venv || $(MAKE) setup
+	cd app && npm run --silent build
+	.venv/bin/python review_server.py
 
-# Export the corpus as a HuggingFace audiofolder dataset in hf/ (needs local audio).
-# Push it with the `hf` CLI, see docs/huggingface.md.
+test:
+	@for t in test_*.py; do echo "== $$t"; python3 $$t || exit 1; done
+
+# Export the corpus as a HuggingFace dataset in hf/. See docs/huggingface.md.
 hf-export:
 	python3 hf_export.py
 	@echo "→ push:  cd hf && hf upload $(HF_REPO) . --repo-type=dataset"

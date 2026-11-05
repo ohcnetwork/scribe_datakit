@@ -4,12 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "bake": "node scripts/bake-metadata.mjs",
-    "dev": "npm run bake && vite",
-    "dev:host": "npm run bake && vite --host",
-    "build": "npm run bake && vite build",
-    "preview": "vite preview --host --port 4173",
-    "serve": "npm run bake && vite build && vite preview --host --port 4173"
+    "build": "vite build",
+    "dev": "vite"
   },
   "dependencies": {
     "lucide-react": "^0.460.0",
@@ -19,6 +15,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "playwright-core": "^1.48.2",
     "vite": "^5.4.8"
   }
 }

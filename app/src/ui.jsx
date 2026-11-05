@@ -18,9 +18,3 @@ export function Input({ icon: Icon, style, ...rest }) {
     </span>
   )
 }
-
-import { WORKFLOW, workflowState } from './store'
-export function StatusBadge({ clip }) {
-  const w = WORKFLOW[workflowState(clip)]
-  return <span className={`status ${w.cls}`}><span className="dot" />{w.label}</span>
-}

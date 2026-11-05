@@ -1,77 +1,53 @@
 # Publishing to HuggingFace
 
-The corpus is published to the Hub as a derived artifact. `metadata.json` stays the
-single source of truth; the HF dataset is regenerated from it, never edited in place.
-Corrections flow through the app → `make apply-corrections`, and you re-export afterwards.
-
-```
-metadata.json (source of truth)
-      └─ make hf-export  → hf/  →  hf upload
-```
+The corpus is published as a derived artifact. `metadata.json` stays the single source of
+truth; the HF dataset is regenerated from it, never edited in place. Reviews arrive as PRs
+on the same repo (see [reviewing.md](reviewing.md)).
 
 ## Export
 
 ```bash
-make hf-export    # needs the audio locally
+make hf-export    # needs flac/ and peaks/ locally
 ```
 
-Output — HF's `audiofolder` layout, which the Hub auto-detects (no loading script):
+Output follows the Hub's folder conventions, so it needs no loading script. Each
+`metadata.jsonl` sits beside its audio with a `file_name` column:
 
 ```
 hf/
-├── README.md                   dataset card (YAML front-matter)
-└── data/train/
-    ├── metadata.jsonl          one row per clip
-    └── <id>.flac               16 kHz mono
+├── README.md                     dataset card; the YAML defines the subsets
+├── data/<collection>/train/
+│   ├── metadata.jsonl            one row per segment
+│   └── <id>_s003.flac            16 kHz mono, 28 s or less
+├── recordings/<collection>/
+│   ├── metadata.jsonl            one row per recording
+│   └── <id>.flac                 16 kHz mono
+└── review/
+    ├── batches/*.json            written by review_admin.py
+    └── peaks/<id>.json           waveforms for the review app
 ```
 
-`hf/` is git-ignored — it's regenerated, not committed.
+**Subsets.** `all` (default) is every segment, there's one per collection, and `recordings`
+holds the full recordings. `review/` isn't part of any subset.
 
-### What `hf-export` does
-
-**Transcodes to 16 kHz mono FLAC.** The webm/opus originals are deliberately *not*
-shipped: HF's `Audio` feature decodes with libsndfile, which has no WebM support at
-all, and these files carry no duration header. FLAC decodes everywhere, is what
-LibriSpeech ships, and ASR models resample to 16 kHz regardless.
-
-**Excludes corrupt clips.** ~9% of the source files have broken container timestamps.
-Left alone, ffmpeg honours them and gap-fills silence — a 627 s clip decodes as 4070 s.
-Those are skipped (`--include-corrupt` to override).
-
-**Verifies every transcode.** Each output is capped at the known duration and re-probed;
-a FLAC whose length disagrees with `metadata.json` is dropped rather than published. The
-export prints how many were dropped — it should be `0`.
-
-**Incremental.** A clip whose `.flac` already exists is skipped, so re-runs after adding
-audio are near-instant. `--force` re-transcodes everything.
+**The audio and metadata always match.** The export deletes audio no row lists and stops if
+a row has no audio. Existing segments are kept; `--force` re-cuts them.
 
 ### Row schema
 
-`file_name` is HF's magic column — it's cast to the `Audio` feature on load.
-
-```json
-{"file_name": "0a1b….flac", "id": "0a1b…", "collection": "scribe-staging",
- "whisper_language": "hi", "spoken_languages": null,
- "generated_transcript": "…", "generated_translation": "…",
- "final_transcript": null, "final_translation": null,
- "duration_sec": 12.3, "confidence": 0.91, "no_speech_prob": 0.02,
- "status": "pending", "category": "medical-scribe", "model": "whisper-large-v3",
- "recorded_at": "2025-…"}
-```
-
-`generated_*` is **always machine text** and `final_*` is **always human-reviewed**;
-there is no fallback between them. English-only audio has no translation, so use
-`final_transcript` as its English text. Train on `status == "final"` rows. (Nothing is
-reviewed yet, so `--min-status` currently exports an empty set.)
+`generated_*` is **always machine text** and `final_*` is **always human-reviewed**; there is
+no fallback between them. English-only audio has no translation, so use `final_transcript` as
+its English text. Train on `status == "final"` rows.
 
 ### Flags
 
 ```bash
-python3 hf_export.py --min-status final     # reviewed, qa_complete or final; never pending/flagged
-python3 hf_export.py --include-corrupt      # include broken-timestamp clips
-python3 hf_export.py --force                # re-transcode everything
+python3 hf_export.py --min-status final     # segment rows at this status or later
+python3 hf_export.py --force                # re-cut every segment
 python3 hf_export.py --license cc0-1.0      # dataset card license (default cc-by-4.0)
 ```
+
+Full recordings always ship, because reviewers need them.
 
 ## Push
 

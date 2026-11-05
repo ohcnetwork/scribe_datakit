@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { Play, Pause, Waves } from 'lucide-react'
-import { fmtDur, fmtSampleRate } from './store'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Play, Pause } from 'lucide-react'
+import { fmtDur } from './store'
 
-// Canvas waveform drawn from precomputed peaks (/peaks/<id>.json), played through
-// a native <audio> element — Chrome decodes these header-less webm/opus fine while
-// audio.duration reports Infinity, so we drive the playhead from our known
-// duration. Matches the design's bar waveform with played/idle colouring.
+// Canvas waveform drawn from precomputed peaks, played through a native <audio>
+// element. playRange() lets a segment row play just its part of the recording.
 function downsample(peaks, n) {
   if (!peaks?.length) return new Array(n).fill(0.04)
   const step = peaks.length / n
@@ -18,21 +16,31 @@ function downsample(peaks, n) {
   return out
 }
 
-export default function Player({ id, src, duration, sampleRate, height = 92, bars = 56, showMeta = false }) {
+export default forwardRef(function Player({ id, src, peaks, duration, height = 92, bars = 56 }, ref) {
   const canvas = useRef(null)
   const audio = useRef(null)
   const barsRef = useRef(null)
   const raf = useRef(0)
+  const stopAt = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [cur, setCur] = useState(0)
 
   useEffect(() => {
-    fetch(`/peaks/${id}.json`)
+    fetch(peaks)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { barsRef.current = downsample(d?.peaks, bars); draw(frac()) })
       .catch(() => { barsRef.current = downsample(null, bars); draw(0) })
     return () => cancelAnimationFrame(raf.current)
-  }, [id, bars])
+  }, [id, peaks, bars])
+
+  useImperativeHandle(ref, () => ({
+    playRange(start, end) {
+      const a = audio.current; if (!a) return
+      stopAt.current = end
+      a.currentTime = start
+      a.play()
+    },
+  }))
 
   // waveform colours come from CSS vars read at draw time → redraw on theme switch
   useEffect(() => {
@@ -72,15 +80,18 @@ export default function Player({ id, src, duration, sampleRate, height = 92, bar
   }
 
   function loop() {
-    setCur(audio.current?.currentTime || 0)
+    const a = audio.current
+    setCur(a?.currentTime || 0)
+    if (a && stopAt.current != null && a.currentTime >= stopAt.current) { stopAt.current = null; a.pause() }
     draw(frac())
     raf.current = requestAnimationFrame(loop)
   }
   function onPlay() { setPlaying(true); cancelAnimationFrame(raf.current); loop() }
   function onPause() { setPlaying(false); cancelAnimationFrame(raf.current); draw(frac()) }
-  function toggle() { const a = audio.current; if (!a) return; a.paused ? a.play() : a.pause() }
+  function toggle() { const a = audio.current; if (!a) return; stopAt.current = null; a.paused ? a.play() : a.pause() }
   function seek(e) {
     const a = audio.current; if (!a || !duration) return
+    stopAt.current = null
     const r = e.currentTarget.getBoundingClientRect()
     a.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration
     setCur(a.currentTime); draw(frac())
@@ -88,23 +99,17 @@ export default function Player({ id, src, duration, sampleRate, height = 92, bar
 
   return (
     <div className="card player-card">
-      <audio ref={audio} src={src} preload="none" onPlay={onPlay} onPause={onPause}
+      <audio ref={audio} src={src} preload="metadata" onPlay={onPlay} onPause={onPause}
         onEnded={onPause} onTimeUpdate={() => setCur(audio.current?.currentTime || 0)} style={{ display: 'none' }} />
       <canvas ref={canvas} className="wave" style={{ height }} onClick={seek} />
       <div className="player-row">
-        <button className="play-lg" onClick={toggle} style={height < 90 ? { width: 42, height: 42 } : undefined}>
+        <button className="play-lg" aria-label={playing ? 'Pause' : 'Play'} onClick={toggle} style={height < 90 ? { width: 42, height: 42 } : undefined}>
           {playing ? <Pause size={height < 90 ? 17 : 19} strokeWidth={1.75} /> : <Play size={height < 90 ? 17 : 19} strokeWidth={1.75} />}
         </button>
         <div className="mono" style={{ fontSize: 14 }}>
           {fmtDur(cur)} <span style={{ color: 'var(--muted-foreground)' }}>/ {fmtDur(duration)}</span>
         </div>
-        {showMeta && <>
-          <div style={{ flex: 1 }} />
-          <div className="mono" style={{ fontSize: 13, color: 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Waves size={15} strokeWidth={1.75} />{fmtSampleRate(sampleRate)}
-          </div>
-        </>}
       </div>
     </div>
   )
-}
+})
