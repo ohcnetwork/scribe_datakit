@@ -12,7 +12,7 @@ channel layout, bitrate, duration, corruption flag, and container tags. Duration
 computed defensively — these webm files carry no duration header and ~7% have
 corrupt timestamps that gap-fill silence to 24h+; see compute_duration().
 
-User-owned fields (segments, spoken_languages, status, category, collection) are always
+User-owned fields (segments, spoken_languages, speaker_id, status, category, collection) are always
 preserved across runs. ffmpeg + ffprobe must be on PATH.
 
     python build_metadata.py            # incremental
@@ -29,10 +29,11 @@ EXTS = (".webm", ".mp4", ".ogg", ".mp3", ".wav", ".m4a")
 SCHEMA_VERSION = 2   # bump when the clip/doc shape changes; the app warns on mismatch
 
 # fields owned by the user / transcription job — never overwritten by a re-probe
-KEEP = ("segments", "whisper_language", "spoken_languages", "model", "status",
+KEEP = ("segments", "whisper_language", "spoken_languages", "speaker_id", "model", "status",
         "category", "collection", "reviewed_by", "qa_by")
 MODEL_USER_DEFAULTS = {
-    "segments": [], "whisper_language": None, "spoken_languages": None, "model": None,
+    "segments": [], "whisper_language": None, "spoken_languages": None, "speaker_id": None,
+    "model": None,
     "status": "pending", "category": "uncategorized", "reviewed_by": None, "qa_by": None,
 }
 # derived fields; if any is missing on a cached record we re-probe it (auto-migrate)
@@ -143,6 +144,7 @@ def probe(fname):
         "tags": tags,
         "whisper_language": None,   # Whisper's guess, by audio covered; unreliable
         "spoken_languages": None,   # human-confirmed list, e.g. ["ml", "en"]; null = unconfirmed
+        "speaker_id": None,         # null until known
         "segments": [],             # time ranges holding the text (segment_audio.py)
         "model": None,
         "status": "pending",

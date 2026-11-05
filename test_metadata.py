@@ -64,7 +64,7 @@ def main():
         if dur:
             kbps = c["size_bytes"] * 8 / dur / 1000
             assert kbps >= 1, f"{c['filename']}: {kbps:.2f} kbps — corruption not corrected"
-        assert set(("id", "whisper_language", "spoken_languages", "collection", "segments",
+        assert set(("id", "whisper_language", "spoken_languages", "speaker_id", "collection", "segments",
                     "model", "status", "category", "container", "codec", "channels",
                     "bitrate_kbps", "tags")) <= c.keys()
         assert c["status"] in STATUSES, f"{c['filename']}: bad status {c['status']!r}"

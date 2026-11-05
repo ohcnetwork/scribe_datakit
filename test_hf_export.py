@@ -10,7 +10,7 @@ def seg(i, **kw):
 
 
 FIN = {"id": "fin", "collection": "c1", "status": "final", "duration_sec": 20.0,
-       "spoken_languages": ["ml", "en"],
+       "spoken_languages": ["ml", "en"], "speaker_id": "spk1",
        "segments": [seg(0, final_translation="human"), seg(1, excluded=True)]}
 PEND = {"id": "pend", "collection": "c2", "status": "pending", "duration_sec": 5.0,
         "segments": [seg(0)]}
@@ -28,6 +28,8 @@ def test_select():
 def test_segment_row_keeps_text_apart():
     r = segment_row(FIN, FIN["segments"][0])
     assert r["file_name"] == "fin_s000.flac" and r["recording_id"] == "fin"
+    assert r["speaker_id"] == "spk1" and recording_row(FIN)["speaker_id"] == "spk1"
+    assert recording_row(PEND)["speaker_id"] is None      # unknown speakers stay null
     assert r["final_translation"] == "human" and r["generated_transcript"] == "auto0"
     assert r["final_transcript"] is None          # machine text never fills a human column
     assert seg_id(PEND, PEND["segments"][0]) == "pend_s000"

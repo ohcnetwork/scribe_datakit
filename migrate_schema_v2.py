@@ -29,6 +29,7 @@ def migrate(doc, collection):
             c.pop(k, None)
         c["whisper_language"] = c.pop("language", None)
         c["spoken_languages"] = None     # null = no human has confirmed the language yet
+        c["speaker_id"] = None
         c["collection"] = collection
         c["segments"] = []
         c["status"] = "pending"

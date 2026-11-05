@@ -13,6 +13,7 @@ inside the recording. That keeps context for reviewers while each segment fits W
 | `duration_sec` | derived | sum of the audio packet durations |
 | `corrupt` | derived | broken container timestamps; the audio itself is usable |
 | `collection` | set on arrival | which batch of source data the recording came from |
+| `speaker_id` | set on arrival | who is speaking; null when unknown |
 | `whisper_language` | model | Whisper's guess by audio covered; unreliable |
 | `spoken_languages` | reviewer | confirmed list, e.g. `["ml", "en"]`; null until confirmed, and wins over the guess |
 | `model` | model | e.g. `whisper-large-v3` |

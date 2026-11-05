@@ -38,7 +38,8 @@ def select_clips(clips, min_status=None):
 
 def segment_row(c, s):
     return {"file_name": f"{seg_id(c, s)}.flac", "id": seg_id(c, s), "recording_id": c["id"],
-            "collection": c["collection"], "start": s["start"], "end": s["end"],
+            "collection": c["collection"], "speaker_id": c.get("speaker_id"),
+            "start": s["start"], "end": s["end"],
             "duration_sec": round(s["end"] - s["start"], 2),
             "whisper_language": s.get("whisper_language"),
             "spoken_languages": c.get("spoken_languages"),
@@ -56,6 +57,7 @@ def joined(segments, key):
 
 def recording_row(c):
     return {"file_name": f"{c['id']}.flac", "id": c["id"], "collection": c["collection"],
+            "speaker_id": c.get("speaker_id"),
             "duration_sec": c["duration_sec"], "segment_count": len(c["segments"]),
             "whisper_language": c.get("whisper_language"),
             "spoken_languages": c.get("spoken_languages"),
