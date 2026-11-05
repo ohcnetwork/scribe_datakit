@@ -1,8 +1,18 @@
 .DS_Store
+.env
+__pycache__/
 app/node_modules/
 app/dist/
 app/public/dataset.zip
-# dataset — not pushed to the repo
+# dataset — synced from the GCS bucket, never committed
 audio/
 metadata.json
 peaks/
+# generated HuggingFace export (transcoded flac + card); push it with the hf CLI
+hf/
+# metadata baked into the bundle at build time
+app/src/data.json
+# dev-only symlinks created by `make pull`
+app/public/audio
+app/public/peaks
+app/public/metadata.json

@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:host": "vite --host",
-    "build": "vite build",
+    "bake": "node scripts/bake-metadata.mjs",
+    "dev": "npm run bake && vite",
+    "dev:host": "npm run bake && vite --host",
+    "build": "npm run bake && vite build",
     "preview": "vite preview --host --port 4173",
-    "serve": "vite build && vite preview --host --port 4173"
+    "serve": "npm run bake && vite build && vite preview --host --port 4173"
   },
   "dependencies": {
     "lucide-react": "^0.460.0",

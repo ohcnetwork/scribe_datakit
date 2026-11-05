@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// public/ symlinks metadata.json and audio/ to the repo root, so /metadata.json
-// and /audio/<file> are served as-is in dev and copied on build.
+// In dev, public/{audio,peaks} symlink to the repo root (created by `make pull`)
+// so /audio/<file> and /peaks/<id>.json serve local data with an empty asset base.
+// In production the app fetches them from the bucket (VITE_ASSET_BASE); metadata is
+// baked into the bundle (scripts/bake-metadata.mjs), not served from public/.
 export default defineConfig({
   plugins: [react()],
   server: { fs: { allow: ['..', '../..'] } },

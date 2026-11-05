@@ -57,14 +57,36 @@ def ffprobe_json(path):
     return fmt, astream
 
 
-def compute_duration(path, codec, size):
+OPUS_FRAME_SEC = 0.06   # these files are 60 ms/packet — validated against every healthy clip
+
+
+def opus_packets(path):
+    """Coded frame count for the audio stream, or None."""
+    try:
+        n = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-count_packets",
+             "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=300).stdout.strip()
+        return int(n) if n.isdigit() else None
+    except Exception:
+        return None
+
+
+def compute_duration(path, codec):
     """Real duration + corruption flag.
 
-    Decode to null and read the real `time=` (accurate for any codec). If that
-    implies < 8 kbps it's impossible for this ~128 kbps opus voice — the decoder
-    inflated it with gap-filled silence, so fall back to the coded-frame count
-    (opus = 60 ms/pkt, validated exactly against healthy files)."""
-    duration = None
+    ~11% of these webm files carry broken container timestamps. The decoder honours
+    them and gap-fills silence, so the reported `time=` inflates wildly (one 627 s
+    clip reads as 4070 s). For opus the coded-frame count is immune to that and
+    exact, so it *is* the duration; the decoded time is only used to detect the
+    disagreement, which is precisely what "corrupt" means here.
+
+    Don't reintroduce a bitrate threshold to spot the bad ones — that's what the
+    previous version did (< 8 kbps) and it silently missed 26 clips whose inflation
+    only dragged them down to 9–20 kbps. Comparing against the frame count has no
+    magic number to get wrong. Non-opus codecs have no frame-count shortcut and keep
+    the decoded time."""
+    decoded = None
     try:
         err = subprocess.run(
             ["ffmpeg", "-v", "error", "-stats", "-err_detect", "ignore_err",
@@ -73,22 +95,17 @@ def compute_duration(path, codec, size):
         m = re.findall(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", err)
         if m:
             h, mm, s = m[-1]
-            duration = round(int(h) * 3600 + int(mm) * 60 + float(s), 2)
+            decoded = round(int(h) * 3600 + int(mm) * 60 + float(s), 2)
     except Exception:
         pass
 
-    corrupt = False
-    if codec == "opus" and duration and size * 8 / duration < 8000:
-        try:
-            n = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "a:0", "-count_packets",
-                 "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", path],
-                capture_output=True, text=True, timeout=300).stdout.strip()
-            if n.isdigit():
-                duration, corrupt = round(int(n) * 0.06, 2), True
-        except Exception:
-            pass
-    return duration, corrupt
+    if codec == "opus":
+        n = opus_packets(path)
+        if n:
+            coded = round(n * OPUS_FRAME_SEC, 2)
+            corrupt = decoded is None or abs(decoded - coded) > max(1.0, 0.05 * coded)
+            return coded, corrupt
+    return decoded, False
 
 
 def probe(fname):
@@ -108,7 +125,7 @@ def probe(fname):
     codec = astream.get("codec_name")
     sr = astream.get("sample_rate")
     ch = astream.get("channels")
-    duration, corrupt = compute_duration(path, codec, size)
+    duration, corrupt = compute_duration(path, codec)
     tags = {k.lower(): v for k, v in (fmt.get("tags") or {}).items()}
 
     return {

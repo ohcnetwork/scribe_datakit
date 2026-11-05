@@ -7,8 +7,9 @@ import {
 import Player from './Player'
 import { Button, Input, StatusBadge } from './ui'
 import { useStore, CATEGORIES, fmtDur, fmtSize, fmtSampleRate, fmtTotalDur, dirFor, langName, WORKFLOW, WORKFLOW_ORDER, workflowState } from './store'
+import { asset } from './asset'
 
-const audioSrc = (c) => `/audio/${c.filename}`
+const audioSrc = (c) => asset(`/audio/${c.filename}`)
 const shortId = (id) => id.slice(0, 8)
 
 // group clips by a key → { count, dur } (single pass)
@@ -205,7 +206,7 @@ export function DatasetDownload() {
             {['WebM · Opus 48 kHz', 'metadata.json', 'open dataset'].map((t) => <span key={t} className="chip sm">{t}</span>)}
           </div>
         </div>
-        <a className="btn lg" href="/dataset.zip" download onClick={() => showToast('Starting dataset.zip download…')}>
+        <a className="btn lg" href={asset('/dataset.zip')} download onClick={() => showToast('Starting dataset.zip download…')}>
           <Download size={17} strokeWidth={1.75} />Download .zip
         </a>
       </div>
@@ -217,7 +218,7 @@ export function DatasetDownload() {
             Open any clip and use <strong style={{ color: 'var(--foreground)', fontWeight: 600 }}>Download clip</strong> to grab a single file.
           </p>
         </div>
-        <a className="card" href="/metadata.json" download style={{ padding: 18, display: 'block' }}>
+        <a className="card" href={asset('/metadata.json')} download style={{ padding: 18, display: 'block' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><Braces size={17} strokeWidth={1.75} style={{ color: 'var(--muted-foreground)' }} /><span style={{ fontSize: 14, fontWeight: 600 }}>Manifest (metadata.json)</span></div>
           <p className="mono" style={{ fontSize: 12, color: 'var(--muted-foreground)', lineHeight: 1.5, margin: '8px 0 0' }}>
             {'{ id, filename, duration_sec, sample_rate, language, transcript, confidence, status }'}

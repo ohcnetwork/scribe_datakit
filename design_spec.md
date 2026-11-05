@@ -19,7 +19,7 @@ favour density, keyboard flow, and fast correction over marketing polish.
 | Fact | Value |
 |---|---|
 | Clips | 601 |
-| Total audio | ~9.7 h |
+| Total audio | ~6.9 h |
 | Duration: min / median / max | 0.8 s / 27.5 s / 68 min |
 | Formats | 590 `webm`, 7 `mp4`, 4 `ogg` |
 | Codec / sample rate | Opus, 48 kHz, mono |

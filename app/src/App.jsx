@@ -21,7 +21,7 @@ function useTheme() {
 }
 
 function Shell() {
-  const { doc, error, editCount, exportCorrections, showToast } = useStore()
+  const { doc, editCount, exportCorrections, showToast } = useStore()
   const [theme, toggleTheme] = useTheme()
   const nav = useNavigate()
 
@@ -67,17 +67,13 @@ function Shell() {
         </header>
 
         <div className="scroll">
-          {error
-            ? <div className="page" style={{ maxWidth: 900 }}><p style={{ color: 'var(--destructive)' }}>Failed to load metadata.json: {error}</p></div>
-            : (
-              <Routes>
-                <Route path="/" element={<CollectionList />} />
-                <Route path="/clip/:id" element={<ClipDetail />} />
-                <Route path="/clip/:id/edit" element={<EditView />} />
-                <Route path="/categories" element={<CategoryBrowse />} />
-                <Route path="/download" element={<DatasetDownload />} />
-              </Routes>
-            )}
+          <Routes>
+            <Route path="/" element={<CollectionList />} />
+            <Route path="/clip/:id" element={<ClipDetail />} />
+            <Route path="/clip/:id/edit" element={<EditView />} />
+            <Route path="/categories" element={<CategoryBrowse />} />
+            <Route path="/download" element={<DatasetDownload />} />
+          </Routes>
         </div>
       </main>
 

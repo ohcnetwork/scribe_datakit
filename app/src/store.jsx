@@ -1,20 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import doc from './data.json'   // metadata baked into the bundle at build time (scripts/bake-metadata.mjs)
 
-// The site is static: no server. Base facts come from /metadata.json; user edits
-// (transcript / status / category) live in localStorage and are merged on top,
-// then exported as a corrections file to be merged back upstream.
+// The site is static and credential-free: base facts are baked in at build time
+// (no runtime metadata fetch, no GCS hit per render); audio/peaks come from the
+// public bucket via asset(). User edits (transcript / status / category) live in
+// localStorage, merged on top, then exported as a corrections file to submit as a PR.
 const LS_KEY = 'scribe-edits-v1'
 const EXPECTED_SCHEMA = 1   // keep in sync with build_metadata.SCHEMA_VERSION
 const Ctx = createContext(null)
+
+if (doc.schema_version !== EXPECTED_SCHEMA)
+  console.warn(`metadata schema_version ${doc.schema_version} != expected ${EXPECTED_SCHEMA} — fields may be missing`)
 
 function loadEdits() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || {} } catch { return {} }
 }
 
 export function StoreProvider({ children }) {
-  const [base, setBase] = useState(null)
   const [edits, setEdits] = useState(loadEdits)
-  const [error, setError] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   function showToast(msg) {
@@ -23,24 +26,11 @@ export function StoreProvider({ children }) {
     toastTimer.current = setTimeout(() => setToast(null), 2600)
   }
 
-  useEffect(() => {
-    fetch('/metadata.json')
-      .then((r) => { if (!r.ok) throw new Error(`metadata.json ${r.status}`); return r.json() })
-      .then((d) => {
-        if (d.schema_version !== EXPECTED_SCHEMA)
-          console.warn(`metadata.json schema_version ${d.schema_version} != expected ${EXPECTED_SCHEMA} — fields may be missing`)
-        setBase(d)
-      })
-      .catch((e) => setError(e.message))
-  }, [])
-
   useEffect(() => { localStorage.setItem(LS_KEY, JSON.stringify(edits)) }, [edits])
 
   // merge base clip + local edit (edit wins on the three user fields)
-  const clips = useMemo(() => {
-    if (!base) return []
-    return base.clips.map((c) => ({ ...c, ...(edits[c.id] || {}) }))
-  }, [base, edits])
+  const clips = useMemo(() =>
+    doc.clips.map((c) => ({ ...c, ...(edits[c.id] || {}) })), [edits])
 
   function editClip(id, patch) {
     setEdits((e) => ({ ...e, [id]: { ...(e[id] || {}), ...patch } }))
@@ -59,7 +49,7 @@ export function StoreProvider({ children }) {
   }
 
   const value = {
-    clips, doc: base, error,
+    clips, doc,
     editCount: Object.keys(edits).length,
     editClip, exportCorrections,
     clearEdits: () => setEdits({}),
