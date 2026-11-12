@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 // All data comes from the local review server (review_server.py); nothing is baked in.
 export async function api(path, method = 'GET', body) {
@@ -10,6 +10,20 @@ export async function api(path, method = 'GET', body) {
   const data = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(data.error || 'Something went wrong. Try again.')
   return data
+}
+
+// Which Hugging Face repo this app talks to (HF_ORG / HF_DATASET in .env). No HF calls, so it's instant.
+let configP
+export function useConfig() {
+  const [cfg, setCfg] = useState(null)
+  useEffect(() => { (configP ||= api('/config')).then(setCfg).catch(() => {}) }, [])
+  return cfg
+}
+export const hf = {
+  repo: (repo) => `https://huggingface.co/datasets/${repo}`,
+  prs: (repo) => `https://huggingface.co/datasets/${repo}/discussions?type=pull_request`,
+  pr: (repo, num) => `https://huggingface.co/datasets/${repo}/discussions/${num}`,
+  org: (org) => `https://huggingface.co/${org}`,
 }
 
 const Ctx = createContext(null)

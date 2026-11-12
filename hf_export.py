@@ -17,6 +17,8 @@ files that no longer belong are removed so the audio and the metadata always mat
 import argparse, json, os, shutil, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 
+from review_server import REPO
+
 HERE = os.path.dirname(__file__)
 META = os.path.join(HERE, "metadata.json")
 FLAC_DIR = os.path.join(HERE, "flac")
@@ -178,7 +180,7 @@ def main():
     ap.add_argument("--min-status", choices=STATUS_RANK, help="segment rows at this status or later")
     ap.add_argument("--force", action="store_true", help="re-cut every segment")
     ap.add_argument("--license", default="cc-by-4.0")
-    ap.add_argument("--repo", default=os.environ.get("HF_REPO", "ohcnetwork/scribe_dataset"))
+    ap.add_argument("--repo", default=REPO, help="defaults to HF_ORG/HF_DATASET from .env")
     args = ap.parse_args()
 
     with open(META) as f:
@@ -218,6 +220,8 @@ def main():
     with open(os.path.join(HF_DIR, "README.md"), "w") as f:
         f.write(card(every, args.license, args.repo))
     print(f"wrote {HF_DIR}: {len(jobs)} segments, {len(every)} recordings", file=sys.stderr)
+    print(f"→ push:  cd hf && hf upload {args.repo} . --repo-type=dataset "
+          '--delete "data/*" --delete "recordings/*" --delete "review/peaks/*"', file=sys.stderr)
 
 
 if __name__ == "__main__":

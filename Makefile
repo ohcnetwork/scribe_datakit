@@ -1,5 +1,5 @@
 # Reviewers only need `make review`. The rest is for the maintainer.
-HF_REPO ?= ohcnetwork/scribe_dataset
+# The Hugging Face org and dataset come from .env (read by the Python scripts).
 
 .PHONY: setup review test ingest hf-export
 
@@ -30,4 +30,3 @@ ingest:
 # Export the corpus as a HuggingFace dataset in hf/. See docs/huggingface.md.
 hf-export:
 	python3 hf_export.py
-	@echo "→ push:  cd hf && hf upload $(HF_REPO) . --repo-type=dataset"

@@ -50,6 +50,7 @@ The first time, the app asks for an access token:
 Open **Reviewer guide** in the app's sidebar. It takes you through claiming a batch,
 reviewing clips and submitting your work. [docs/reviewing.md](docs/reviewing.md) has the same
 steps without screenshots.
+**How it works**, also in the sidebar, explains what each step does on Hugging Face.
 
 ## Maintainers
 

@@ -13,14 +13,27 @@ The hub is the only shared state; review_admin.py merges what comes back.
 
     python3 review_server.py            # or: make review
 """
-import argparse, json, mimetypes, os, re, sys, threading, webbrowser
+import argparse, json, mimetypes, os, re, sys, threading, time, webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(HERE, "app", "dist")
 WORK = os.path.join(HERE, "review_work")
-REPO = os.environ.get("HF_REPO", "ohcnetwork/scribe_dataset")
+
+
+def load_env(path=os.path.join(HERE, ".env")):
+    """KEY=value lines from .env; variables already set in the shell win."""
+    if os.path.exists(path):
+        for line in open(path):
+            k, sep, v = line.strip().partition("=")
+            if sep and not k.startswith("#"):
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+load_env()
+HF_ORG = os.environ.get("HF_ORG", "ohcnetwork")
+REPO = f"{HF_ORG}/{os.environ.get('HF_DATASET', 'scribe_dataset')}"
 PORT = 4321
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")   # no "..", no slashes
 LANG = re.compile(r"^[a-z]{2,3}$")
@@ -49,6 +62,24 @@ def clip_complete(clip):
     """Every usable segment has human text."""
     return all(s.get("excluded") or any((s.get(k) or "").strip() for k in TEXT)
                for s in clip["segments"])
+
+
+def hub_error(e):
+    """A message a reviewer can act on, for an exception from huggingface_hub or the network."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    if "EntryNotFoundError" in {c.__name__ for c in type(e).__mro__}:
+        return 502, f"A file is missing from {REPO}. Tell the maintainer which batch you were opening."
+    if status in (401, 403, 404):
+        return 403, (f"Your Hugging Face account can't reach {REPO}. Ask the maintainer to give "
+                     "you access, then try again.")
+    if status == 429:
+        return 429, "Hugging Face is limiting requests from your account. Wait a minute and try again."
+    if status and status >= 500:
+        return 502, "Hugging Face is having trouble right now. Try again in a few minutes."
+    names = {c.__name__ for c in type(e).__mro__}   # httpx's network errors, without importing it
+    if names & {"ConnectionError", "TimeoutError", "TransportError", "LocalEntryNotFoundError"}:
+        return 502, "Can't reach Hugging Face. Check your internet connection and try again."
+    return 500, "Something went wrong talking to Hugging Face. Try again."
 
 
 def apply_edit(clip, patch):
@@ -147,7 +178,12 @@ class Reviewer:
     def __init__(self, hub, work=WORK):
         self.hub, self.work = hub, work
         self.lock = threading.Lock()
+        self.progress = {}      # batch → what a running claim is doing, for the UI to poll
         os.makedirs(work, exist_ok=True)
+
+    def _step(self, batch, step, done=0, total=0, item=None):
+        p = self.progress.setdefault(batch, {"started": time.time()})
+        p.update(step=step, done=done, total=total, item=item)
 
     def _dir(self, batch):
         if not ID.match(batch):
@@ -183,6 +219,7 @@ class Reviewer:
                 else "taken" if c["author"] != user \
                 else "submitted" if c["status"] == "open" else "mine"
             rows.append({"name": name, "state": state, "reviewer": c["author"] if c else None,
+                         "pr": c["num"] if c else None,
                          "local": os.path.exists(os.path.join(self._dir(name), "draft.json"))})
         return {"user": user, "repo": self.hub.repo, "batches": rows}
 
@@ -196,17 +233,39 @@ class Reviewer:
         return self.state()
 
     def claim(self, batch):
+        self.progress.pop(batch, None)
+        try:
+            return self._claim(batch)
+        except ApiError:
+            raise
+        except Exception as e:
+            print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
+            status, message = hub_error(e)
+            if (self.progress.get(batch) or {}).get("total"):
+                message += " Files already downloaded are kept: choose Continue to carry on."
+            raise ApiError(status, message)
+        finally:
+            self.progress.pop(batch, None)
+
+    def _claim(self, batch):
+        self._dir(batch)
+        self._step(batch, "Checking your Hugging Face login")
         user = self.hub.username()
         if not user:
             raise ApiError(401, "Log in to Hugging Face first.")
+        self._step(batch, "Checking the batch exists")
         if batch not in self.hub.list_batches():
             raise ApiError(404, "That batch doesn't exist.")
+        self._step(batch, "Checking nobody else has claimed it")
         live = [c for c in self.hub.list_claims() if c["batch"] == batch and c["status"] != "closed"]
         mine = next((c for c in live if c["author"] == user), None)
         if live and live[0] is not mine:
             raise ApiError(409, f"{live[0]['author']} already claimed this batch.")
+        if not mine:
+            self._step(batch, "Opening your claim (a draft pull request)")
         num = mine["num"] if mine else self.hub.open_claim(batch)
         if not mine:      # two people can claim at once: the lowest PR number wins
+            self._step(batch, "Making sure your claim came first")
             live = [c for c in self.hub.list_claims()
                     if c["batch"] == batch and c["status"] != "closed"]
             if live[0]["num"] != num:
@@ -224,13 +283,16 @@ class Reviewer:
             doc = self._load(batch)      # never overwrite local work
             doc["pr"] = num
         else:
+            self._step(batch, "Downloading the batch's text")
             doc = json.loads(self.hub.read_file(f"review/batches/{batch}.json"))
             doc["pr"] = num
             for c in doc["clips"]:
                 c["done"] = False
-        for c in doc["clips"]:
+        n = len(doc["clips"])
+        for i, c in enumerate(doc["clips"]):
+            self._step(batch, "Downloading audio and waveforms", i, n, c["id"])
             audio = os.path.join(d, "audio", f"{c['id']}.flac")
-            if not os.path.exists(audio):
+            if not os.path.exists(audio):     # files already here are kept, so a failed claim resumes
                 self.hub.fetch_to(f"recordings/{c['collection']}/{c['id']}.flac", audio)
             peaks = os.path.join(d, "peaks", f"{c['id']}.json")
             if not os.path.exists(peaks):
@@ -363,6 +425,8 @@ def make_handler(reviewer, dist=DIST, port=PORT):
             body = {} if method == "GET" else self._body()   # always drain it: keep-alive reuses the socket
             if parts[:1] == ["api"]:
                 rest = parts[1:]
+                if method == "GET" and rest == ["config"]:     # no Hugging Face calls: instant
+                    return self._json(200, {"repo": REPO, "org": HF_ORG})
                 if method == "GET" and rest == ["state"]:
                     return self._json(200, reviewer.state())
                 if method == "POST" and rest == ["login"]:
@@ -371,6 +435,8 @@ def make_handler(reviewer, dist=DIST, port=PORT):
                     batch = rest[1]
                     if method == "GET" and len(rest) == 2:
                         return self._json(200, reviewer.batch(batch))
+                    if method == "GET" and rest[2:] == ["progress"]:
+                        return self._json(200, reviewer.progress.get(batch) or {})
                     if method == "POST" and rest[2:] == ["claim"]:
                         return self._json(200, reviewer.claim(batch))
                     if method == "POST" and rest[2:] == ["submit"]:
@@ -403,8 +469,9 @@ def make_handler(reviewer, dist=DIST, port=PORT):
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as e:
-                print(f"error: {e}", file=sys.stderr)
-                self._json(500, {"error": "Something went wrong talking to Hugging Face. Try again."})
+                print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
+                status, message = hub_error(e)
+                self._json(status, {"error": message})
 
         do_GET = do_POST = do_PATCH = _handle
 
@@ -419,7 +486,7 @@ def main():
     reviewer = Reviewer(Hub())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(reviewer, port=args.port))
     url = f"http://127.0.0.1:{args.port}"
-    print(f"Review app running at {url}  (Ctrl-C to stop)")
+    print(f"Review app running at {url} for {REPO}  (Ctrl-C to stop)")
     if not args.no_browser:
         webbrowser.open(url)
     try:

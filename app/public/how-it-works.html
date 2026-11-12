@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body { margin: 0; }</style>
+<script>try { var t = localStorage.getItem("scribe-theme"); if (t) document.documentElement.dataset.theme = t } catch (e) {}</script>
+<title>How Review Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/guide/guide.css">
+<style>
+/* Three places, two arrows: your computer, the Hugging Face repo, the maintainer. */
+.map { display: grid; grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1.25fr) 70px minmax(0, 1fr); align-items: stretch; margin-top: 36px; }
+.place { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.place.hub { border: 2px solid var(--accent); }
+.place ul { margin: 0; padding-left: 18px; font-size: .92rem; display: grid; gap: 4px; }
+.arrows { display: grid; align-content: center; gap: 10px; font: 500 .72rem var(--mono); color: var(--muted); text-align: center; }
+.arrows span::before { display: block; font-size: 1.2rem; color: var(--accent); }
+.arrows .r::before { content: "→"; }
+.arrows .l::before { content: "←"; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.repo { font: 500 .95rem var(--mono); overflow-wrap: anywhere; }
+.when { font: 500 .78rem var(--mono); color: var(--muted); }
+@media (max-width: 760px) {
+  .map { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .arrows { grid-auto-flow: column; justify-content: center; gap: 22px; }
+  .arrows .r::before { content: "↓"; }
+  .arrows .l::before { content: "↑"; }
+}
+</style>
+
+<header class="wrap">
+  <div class="hero">
+    <span class="eyebrow">Scribe speech dataset · how it works</span>
+    <h1>One repo on Hugging Face. Everything else is on your computer.</h1>
+    <p class="lede">There's no review server. The app runs on your computer and talks to the dataset repo <a class="repo" data-hf="repo" href="#">ohcnetwork/scribe_dataset</a> as you, with your own Hugging Face account. The repo's files and pull requests are the only things reviewers and the maintainer share.</p>
+    <div class="actions">
+      <a class="btn solid" data-hf="repo" href="#" target="_blank" rel="noreferrer">Open the dataset</a>
+      <a class="btn line" data-hf="prs" href="#" target="_blank" rel="noreferrer">See claims and submissions</a>
+      <a class="btn line" data-hf="org" href="#" target="_blank" rel="noreferrer">The organisation</a>
+    </div>
+  </div>
+
+  <div class="map">
+    <div class="place">
+      <span class="eyebrow">Your computer</span>
+      <h3>The review app</h3>
+      <ul>
+        <li>Your Hugging Face token</li>
+        <li><code>review_work/&lt;batch&gt;/</code>: audio, waveforms and your draft</li>
+        <li>Saves every edit to disk</li>
+      </ul>
+    </div>
+    <div class="arrows" aria-hidden="true"><span class="l">download</span><span class="r">claim, submit</span></div>
+    <div class="place hub">
+      <span class="eyebrow">Hugging Face</span>
+      <h3 class="repo" data-hf-text="repo">ohcnetwork/scribe_dataset</h3>
+      <ul>
+        <li>Recordings, batches and waveforms (files)</li>
+        <li>One pull request per claim</li>
+        <li>Your submission, inside that pull request</li>
+      </ul>
+    </div>
+    <div class="arrows" aria-hidden="true"><span class="r">merge</span><span class="l">upload</span></div>
+    <div class="place">
+      <span class="eyebrow">Maintainer</span>
+      <h3><code>metadata.json</code></h3>
+      <ul>
+        <li>The source of truth</li>
+        <li>Checks and merges submissions</li>
+        <li>Uploads new batches and the dataset</li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="files">
+    <div class="head">
+      <h2>What's in the repo</h2>
+      <p class="muted">The dataset repo holds the training data and the review files. Each path links to it on Hugging Face.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Path</th><th>What it is</th><th>Who uses it</th></tr></thead>
+      <tbody>
+        <tr><td><a data-hf-path="review/batches" href="#"><code>review/batches/</code></a></td><td>One JSON file per batch: its recordings, their segments and Whisper's text. No audio.</td><td>The app lists these as batches</td></tr>
+        <tr><td><a data-hf-path="recordings" href="#"><code>recordings/&lt;collection&gt;/</code></a></td><td>Each full recording as FLAC.</td><td>Downloaded when you claim</td></tr>
+        <tr><td><a data-hf-path="review/peaks" href="#"><code>review/peaks/</code></a></td><td>A small waveform outline per recording, so the player draws instantly.</td><td>Downloaded when you claim</td></tr>
+        <tr><td><code>review/submissions/&lt;batch&gt;.json</code></td><td>Your reviewed text. It exists only inside your claim's pull request until the maintainer merges it.</td><td>Written when you submit</td></tr>
+        <tr><td><a data-hf-path="data" href="#"><code>data/</code></a></td><td>Segment clips and their text, ready for training.</td><td>People using the dataset</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="claims">
+    <div class="head">
+      <h2>A claim is a pull request</h2>
+      <p class="muted">When you claim a batch, the app opens a draft pull request titled <code>[claim] &lt;batch name&gt;</code>. Everyone with access can see it, so nobody else takes the same batch. The pull request's state is the batch's state.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Pull request</th><th>The app shows</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>none, or all closed</td><td>Available</td><td>Anyone can claim it.</td></tr>
+        <tr><td>draft</td><td>Claimed by you, or by someone</td><td>Being reviewed. Nothing has been sent yet.</td></tr>
+        <tr><td>open</td><td>Submitted, waiting for the maintainer</td><td>Your submission is in the pull request.</td></tr>
+        <tr><td>merged</td><td>Finished by you</td><td>The maintainer accepted it.</td></tr>
+      </tbody>
+    </table></div>
+    <p>If two people claim the same batch at the same moment, the lower pull request number wins and the app closes the other one. Each batch in the app links to its pull request, and <a data-hf="prs" href="#" target="_blank" rel="noreferrer">all claims are listed here</a>.</p>
+  </section>
+
+  <section id="steps">
+    <div class="head">
+      <h2>What each step does on Hugging Face</h2>
+      <p class="muted">The app shows what it's doing while each step runs. This is what's behind it.</p>
+    </div>
+    <ol class="steps">
+      <li><h3>Connect</h3><div class="body">
+        <p>Your token is checked with Hugging Face and saved on this computer by the Hugging Face library, where any Hugging Face tool on it can use it. It's never sent anywhere else.</p>
+        <p class="when">a few seconds</p></div></li>
+      <li><h3>Open the Batches page</h3><div class="body">
+        <p>The app asks who you are, lists the files in <code>review/batches/</code> and lists the claim pull requests. Choose <b>Refresh</b> to see claims other people made since you opened the page.</p>
+        <p class="when">a few seconds</p></div></li>
+      <li><h3>Claim</h3><div class="body">
+        <p>The app checks nobody holds the batch, opens your draft pull request, checks again that yours came first, then downloads the batch file and, for every recording, its audio and waveform.</p>
+        <p>The downloads take the time: a batch has 20 to 60 recordings, so that's 40 to 120 files, one after another. The app counts them as it goes. If it stops partway, what's already downloaded is kept, and <b>Continue</b> carries on from there.</p>
+        <p class="when">about a minute, longer on slow connections</p></div></li>
+      <li class="you"><h3>Review</h3><div class="body">
+        <p>Nothing touches Hugging Face. Every edit is saved to <code>review_work/&lt;batch&gt;/draft.json</code>, so you can work offline and stop at any time. <b>Continue</b> on a batch already on this computer opens it straight away.</p>
+        <p class="when">instant</p></div></li>
+      <li><h3>Submit</h3><div class="body">
+        <p>The app writes your text to <code>review/submissions/&lt;batch&gt;.json</code> as a commit on your pull request, then changes the pull request from draft to open. Submitting again replaces the file in the same pull request.</p>
+        <p class="when">a few seconds</p></div></li>
+      <li><h3>The maintainer merges</h3><div class="body">
+        <p>The maintainer's script reads every open claim pull request from a listed reviewer, applies only the reviewed text, languages and category, and merges the pull request. The batch then shows as finished. The updated dataset is uploaded later.</p></div></li>
+    </ol>
+  </section>
+
+  <section id="visible">
+    <div class="head"><h2>Who sees what</h2></div>
+    <div class="rules">
+      <div><h3>Visible to others with access</h3><p>Your username on the claim pull request, as soon as you claim. Your text, once you submit.</p></div>
+      <div><h3>Only on your computer</h3><p>Your token, and your drafts until you submit. If you lose <code>review_work/</code> before submitting, the work is gone.</p></div>
+    </div>
+  </section>
+
+  <section id="errors">
+    <div class="head"><h2>When Hugging Face says no</h2></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>The app says</th><th>Why</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>"Your Hugging Face account can't reach …"</td><td>Your account hasn't been given access to the repo, or the token is for another account.</td><td>Send your username to the maintainer.</td></tr>
+        <tr><td>"Hugging Face is limiting requests…"</td><td>Too many requests in a short time.</td><td>Wait a minute, then try again.</td></tr>
+        <tr><td>"Can't reach Hugging Face"</td><td>No internet, or it dropped.</td><td>Reconnect and try again. Downloads carry on where they stopped.</td></tr>
+        <tr><td>"A file is missing from …"</td><td>The batch points at a recording that isn't uploaded.</td><td>Tell the maintainer the batch name.</td></tr>
+        <tr><td>"Hugging Face is having trouble"</td><td>An outage on their side.</td><td>Try again in a few minutes.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="config">
+    <div class="head"><h2>For maintainers: choosing the repo</h2></div>
+    <p>The organisation and dataset come from <code>.env</code> in the project folder: <code>HF_ORG=ohcnetwork</code> and <code>HF_DATASET=scribe_dataset</code>. The app, <code>review_admin.py</code> and <code>hf_export.py</code> all read it. A variable set in the shell wins, so <code>HF_ORG=me HF_DATASET=test_repo make review</code> points one run at a test repo.</p>
+  </section>
+</main>
+
+<footer class="wrap"><p>For how to review, see the <a href="/guide.html">Reviewer guide</a>.</p></footer>
+
+<script>
+// Fill links from the app's own config, so they follow HF_ORG / HF_DATASET in .env.
+fetch('/api/config').then(function (r) { return r.ok ? r.json() : null }).catch(function () { return null })
+  .then(function (cfg) {
+    var repo = (cfg && cfg.repo) || 'ohcnetwork/scribe_dataset', org = (cfg && cfg.org) || repo.split('/')[0];
+    var base = 'https://huggingface.co/datasets/' + repo;
+    var urls = { repo: base, prs: base + '/discussions?type=pull_request', org: 'https://huggingface.co/' + org };
+    document.querySelectorAll('[data-hf]').forEach(function (a) { a.href = urls[a.dataset.hf]; a.target = '_blank'; a.rel = 'noreferrer'; });
+    document.querySelectorAll('[data-hf-path]').forEach(function (a) { a.href = base + '/tree/main/' + a.dataset.hfPath; a.target = '_blank'; a.rel = 'noreferrer'; });
+    document.querySelectorAll('[data-hf-text]').forEach(function (e) { e.textContent = repo; });
+    document.querySelectorAll('a.repo[data-hf]').forEach(function (e) { e.textContent = repo; });
+  });
+</script>

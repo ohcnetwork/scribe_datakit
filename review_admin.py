@@ -187,7 +187,7 @@ def main():
         for batch in made:
             with open(os.path.join(out, batch["name"] + ".json"), "w") as fh:
                 json.dump(batch_payload(batch), fh, ensure_ascii=False, indent=1)
-        print(f"wrote {len(made)} batch(es) to {out}; upload with: make hf-export, then hf upload")
+        print(f"wrote {len(made)} batch(es) to {out}; upload with: make hf-export, then the push command it prints")
     elif args.cmd == "merge":
         from review_server import Hub
         with open(REVIEWERS) as fh:

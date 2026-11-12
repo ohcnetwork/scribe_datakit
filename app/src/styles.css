@@ -242,3 +242,16 @@ a.batch-row:hover { background: var(--muted); }
 .saved { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--status-final); font-weight: 600; }
 .finish-bar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 12px 0; background: var(--background); }
 @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+/* activity: what a long Hugging Face call is doing */
+.busy { padding: 14px 16px; }
+.busy .subtitle { margin-top: 8px; }
+.busy-head { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; }
+.spin { animation: spin 1s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.ext-link { display: inline-flex; align-items: center; gap: 3px; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.nav.hub { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.nav-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); padding: 0 11px 6px; }
+.nav a .ext { margin-left: auto; opacity: 0.6; }
+.nav-foot { font-size: 11px; color: var(--muted-foreground); padding: 8px 11px 0; overflow-wrap: anywhere; }

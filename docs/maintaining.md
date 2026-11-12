@@ -29,7 +29,8 @@ There are two kinds:
 ```bash
 python3 review_admin.py batches --collection scribe-staging --minutes 30
 make hf-export
-cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset
+cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset \
+  --delete "data/*" --delete "recordings/*" --delete "review/peaks/*"
 ```
 
 `batches` works through the collection, oldest recording first. It adds recordings to a
@@ -84,7 +85,8 @@ Add each reviewer's Hugging Face username to `reviewers.txt`, one per line. Then
 ```bash
 python3 review_admin.py merge
 make hf-export
-cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset
+cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset \
+  --delete "data/*" --delete "recordings/*" --delete "review/peaks/*"
 ```
 
 `merge` treats every submission as untrusted:

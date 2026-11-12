@@ -9,7 +9,7 @@ import http.client, json, os, tempfile, threading
 from http.server import ThreadingHTTPServer
 
 from review_admin import apply_submission, batch_payload, finalize, make_batches, merge_all
-from review_server import ApiError, Reviewer, make_handler
+from review_server import REPO, ApiError, Reviewer, hub_error, make_handler
 from segment_audio import blank_segment
 
 
@@ -98,7 +98,7 @@ def fails(status, fn):
         fn()
     except ApiError as e:
         assert e.status == status, (e.status, e.message)
-        return True
+        return e.message
     raise AssertionError(f"expected {status}")
 
 
@@ -142,7 +142,7 @@ def test_full_loop():
 
         # someone else can't take it
         bob = Reviewer(hub.as_user("bob"), os.path.join(work, "bob"))
-        assert bob.state()["batches"][0] == {"name": batch, "state": "taken", "reviewer": "ann", "local": False}
+        assert bob.state()["batches"][0] == {"name": batch, "state": "taken", "reviewer": "ann", "pr": 1, "local": False}
         assert fails(409, lambda: bob.claim(batch))
 
         # edit one box: the other stays null, drafts survive a restart
@@ -287,6 +287,45 @@ def test_merge_treats_submissions_as_untrusted():
     assert n == 1 and c["segments"][0]["generated_transcript"] == "t0" and c["segments"][0]["start"] == 0
 
 
+def test_claim_reports_progress_and_resumes():
+    with tempfile.TemporaryDirectory() as tmp:
+        hub = FakeHub()
+        batch = publish(hub, {"clips": [clip("a"), clip("b"), clip("c")]})[0]["name"]
+        view = hub.as_user("ann")
+        r = Reviewer(view, tmp)
+        seen, real = [], view.fetch_to
+
+        def flaky(path, dst):     # the network drops on the second recording's audio
+            seen.append(dict(r.progress[batch]))
+            if path.endswith("/b.flac") and not getattr(flaky, "failed", False):
+                flaky.failed = True
+                raise ConnectionError("dropped")
+            real(path, dst)
+        view.fetch_to = flaky
+        err = fails(502, lambda: r.claim(batch))
+        assert "Can't reach Hugging Face" in err and "Continue" in err, err
+        assert [p["done"] for p in seen] == [0, 0, 1], seen        # counted per recording
+        assert seen[-1]["total"] == 3 and seen[-1]["item"] == "b"
+        assert batch not in r.progress                              # cleared once the claim ends
+        assert r.state()["batches"][0]["state"] == "mine"
+        seen.clear()
+        r.claim(batch)            # resumes: a's files aren't fetched again
+        assert [p["item"] for p in seen] == ["b", "b", "c", "c"], seen
+
+
+def test_hub_errors_read_as_actions():
+    class Resp:
+        def __init__(self, code): self.status_code = code
+
+    def err(code):
+        e = Exception(); e.response = Resp(code); return e
+    assert hub_error(err(401))[0] == 403 and "maintainer" in hub_error(err(404))[1]
+    assert hub_error(err(429))[0] == 429
+    assert hub_error(err(503))[0] == 502
+    assert "internet" in hub_error(TimeoutError())[1]
+    assert hub_error(ValueError())[0] == 500
+
+
 def test_http_layer():
     with tempfile.TemporaryDirectory() as tmp:
         dist = os.path.join(tmp, "dist")
@@ -311,10 +350,14 @@ def test_http_layer():
                 hdrs.setdefault("Content-Type", "application/json")
             c.request(method, path, json.dumps(body) if body is not None else None, hdrs)
             res = c.getresponse()
-            return res.status, res.read(), res
+            body = res.read()
+            c.close()        # an idle kept-alive socket makes the server log noise at exit
+            return res.status, body, res
 
         try:
             assert call("GET", "/api/state")[0] == 200
+            assert json.loads(call("GET", "/api/config")[1])["repo"] == REPO
+            assert call("GET", f"/api/batches/{batch}/progress")[1] == b"{}"
             assert call("GET", "/")[1] == b"<html>app</html>"
             assert call("GET", "/batch/x/clip/y")[1] == b"<html>app</html>"     # client routes
             # another website must not reach this server
@@ -338,7 +381,9 @@ def test_http_layer():
             c.request("POST", f"/api/batches/{batch}/claim", "{}", hdrs)
             assert c.getresponse().read() and True
             c.request("GET", f"/api/batches/{batch}", headers=hdrs)
-            assert c.getresponse().status == 200
+            res = c.getresponse()
+            assert res.status == 200 and res.read()
+            c.close()
             # edits go through
             status, body, _ = call("PATCH", f"/api/batches/{batch}/clips/a",
                                    {"segments": [{"index": 0, "final_translation": "ok"}]})

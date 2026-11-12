@@ -1,15 +1,64 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, Flag, LogIn, Play, Send } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ExternalLink, Flag, Loader2, LogIn, Play, RefreshCw, Send } from 'lucide-react'
 import Player from './Player'
 import { Button } from './ui'
-import { api, useToast, CATEGORIES, clipLangs, isEnglishOnly, segmentDone, fmtDur, dirFor } from './store'
+import { api, useToast, useConfig, hf, CATEGORIES, clipLangs, isEnglishOnly, segmentDone, fmtDur, dirFor } from './store'
 
 const shortId = (id) => id.slice(0, 8)
 
-function Load({ error }) {
-  return <div className="page"><p className={error ? 'error-text' : 'subtitle'}>{error || 'Loading…'}</p></div>
+// Seconds since `since`, ticking, so a long wait visibly isn't frozen.
+function useElapsed(since) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!since) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [since])
+  return since ? Math.max(0, Math.round((now - since) / 1000)) : 0
 }
+
+// What's happening right now, how far along, and for how long.
+function Busy({ step, done, total, item, since, children }) {
+  const secs = useElapsed(since)
+  return (
+    <div className="card busy" role="status" aria-live="polite">
+      <div className="busy-head">
+        <Loader2 size={16} strokeWidth={2} className="spin" />
+        <span style={{ flex: 1 }}>{step}{total ? ` · ${done} of ${total}` : ''}</span>
+        {secs > 0 && <span className="rowid">{secs}s</span>}
+      </div>
+      {total > 0 && (
+        <div className="progress" role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={total}>
+          <span style={{ width: `${(done / total) * 100}%` }} />
+        </div>
+      )}
+      {item && <div className="rowid" style={{ marginTop: 6 }}>clip {shortId(item)}</div>}
+      {children}
+    </div>
+  )
+}
+
+function Load({ error, what = 'Loading…', retry }) {
+  const [since] = useState(Date.now())
+  const secs = useElapsed(error ? null : since)
+  if (error) return (
+    <div className="page"><p className="error-text">{error}</p>
+      {retry && <Button variant="outline" icon={RefreshCw} onClick={retry}>Try again</Button>}</div>
+  )
+  return (
+    <div className="page" style={{ maxWidth: 560 }}>
+      <Busy step={what} since={since}>
+        {secs >= 15 && <p className="subtitle">Hugging Face is slow to answer. If this doesn't finish, check your internet and{' '}
+          {retry ? <a href="#" onClick={(e) => { e.preventDefault(); retry() }}>try again</a> : 'reload the page'}.</p>}
+      </Busy>
+    </div>
+  )
+}
+
+const PrLink = ({ repo, num, children }) => repo && num
+  ? <a className="ext-link" href={hf.pr(repo, num)} target="_blank" rel="noreferrer">{children || `PR #${num}`}<ExternalLink size={11} /></a>
+  : null
 
 // ============ SIGN IN ============
 function Login({ repo, onDone }) {
@@ -36,7 +85,7 @@ function Login({ repo, onDone }) {
         <input id="hf-token" className="input" type="password" autoComplete="off" value={token}
           onChange={(e) => setToken(e.target.value)} style={{ margin: '10px 0 14px' }} />
         {error && <p className="error-text">{error}</p>}
-        <Button icon={LogIn} type="submit" disabled={busy || !token.trim()}>{busy ? 'Connecting…' : 'Connect'}</Button>
+        <Button icon={busy ? Loader2 : LogIn} spin={busy} type="submit" disabled={busy || !token.trim()}>{busy ? 'Checking your token and loading batches…' : 'Connect'}</Button>
       </form>
     </div>
   )
@@ -47,22 +96,48 @@ export function Batches() {
   const [state, setState] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(null)
+  const [progress, setProgress] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
   const nav = useNavigate()
-  useEffect(() => { api('/state').then(setState).catch((e) => setError(e.message)) }, [])
+  const load = () => {
+    setError(null); setRefreshing(true)
+    return api('/state').then(setState).catch((e) => setError(e.message)).finally(() => setRefreshing(false))
+  }
+  useEffect(() => { load() }, [])
 
   async function claim(name) {
     setBusy(name); setError(null)
+    setProgress({ step: 'Starting', since: Date.now() })
+    // the claim is one long request; poll what it's doing meanwhile
+    const poll = setInterval(() => api(`/batches/${name}/progress`)
+      .then((p) => p.step && setProgress((old) => ({ ...p, since: old?.since }))).catch(() => {}), 600)
     try { await api(`/batches/${name}/claim`, 'POST'); nav(`/batch/${name}`) }
-    catch (e) { setError(e.message); setBusy(null); api('/state').then(setState).catch(() => {}) }
+    catch (e) { setError(e.message); setBusy(null); load() }
+    finally { clearInterval(poll); setProgress(null) }
   }
 
-  if (!state) return <Load error={error} />
+  if (!state) return <Load error={error} retry={load} what="Checking your Hugging Face login and the list of batches" />
   if (!state.user) return <Login repo={state.repo} onDone={setState} />
   return (
     <div className="page" style={{ maxWidth: 820 }}>
-      <h1 className="title">Review batches</h1>
-      <p className="subtitle">Signed in as {state.user}. Claim a batch to download it and start reviewing.</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <h1 className="title">Review batches</h1>
+          <p className="subtitle">Signed in as {state.user}, reviewing{' '}
+            <a className="ext-link" href={hf.repo(state.repo)} target="_blank" rel="noreferrer">{state.repo}<ExternalLink size={11} /></a>.
+            {' '}Claim a batch to download it and start reviewing.</p>
+        </div>
+        <Button variant="outline" size="sm" icon={refreshing ? Loader2 : RefreshCw} spin={refreshing} onClick={load} disabled={refreshing || !!busy}
+          title="See claims other reviewers made since you opened this page">{refreshing ? 'Refreshing…' : 'Refresh'}</Button>
+      </div>
       {error && <p className="error-text">{error}</p>}
+      {progress && (
+        <div style={{ marginTop: 16 }}>
+          <Busy {...progress} step={progress.step === 'Starting' ? `Claiming ${busy}` : progress.step}>
+            <p className="subtitle">Keep this page open. Everything is downloaded once, so you can review offline afterwards.</p>
+          </Busy>
+        </div>
+      )}
       <div className="card" style={{ marginTop: 18, overflow: 'hidden' }}>
         {state.batches.map((b) => (
           <div key={b.name} className="batch-row">
@@ -74,10 +149,13 @@ export function Batches() {
                 {b.state === 'taken' && `Claimed by ${b.reviewer}`}
                 {b.state === 'submitted' && 'Submitted, waiting for the maintainer'}
                 {b.state === 'done' && `Finished by ${b.reviewer}`}
+                {b.pr && <> · <PrLink repo={state.repo} num={b.pr} /></>}
               </div>
             </div>
-            {b.state === 'available' && <Button onClick={() => claim(b.name)} disabled={!!busy}>{busy === b.name ? 'Downloading…' : 'Claim'}</Button>}
-            {b.state === 'mine' && <Button variant="outline" onClick={() => claim(b.name)} disabled={!!busy}>{busy === b.name ? 'Opening…' : 'Continue'}</Button>}
+            {b.state === 'available' && <Button onClick={() => claim(b.name)} disabled={!!busy}>{busy === b.name ? 'Claiming…' : 'Claim'}</Button>}
+            {b.state === 'mine' && (b.local && busy !== b.name
+              ? <Link className="btn outline" to={`/batch/${b.name}`}>Continue</Link>
+              : <Button variant="outline" onClick={() => claim(b.name)} disabled={!!busy}>{busy === b.name ? 'Downloading…' : 'Continue'}</Button>)}
             {b.state === 'submitted' && b.local && <Link className="btn outline" to={`/batch/${b.name}`}>Open</Link>}
           </div>
         ))}
@@ -93,17 +171,20 @@ export function Batch() {
   const [doc, setDoc] = useState(null)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(null)
   const { showToast } = useToast()
+  const cfg = useConfig()
   const nav = useNavigate()
   useEffect(() => { api(`/batches/${batch}`).then(setDoc).catch((e) => setError(e.message)) }, [batch])
 
   async function submit() {
-    setError(null)
+    setError(null); setSending(Date.now())
     try {
       const r = await api(`/batches/${batch}/submit`, 'POST')
       setSent(true)
       showToast(`Submitted ${r.submitted} clips`)
     } catch (e) { setError(e.message) }
+    setSending(null)
   }
 
   if (!doc) return <Load error={error} />
@@ -113,7 +194,8 @@ export function Batch() {
     <div className="page" style={{ maxWidth: 820 }}>
       <Button variant="ghost" size="sm" icon={ChevronLeft} onClick={() => nav('/')}>Batches</Button>
       <h1 className="title mono" style={{ fontSize: 22, marginTop: 14 }}>{batch}</h1>
-      <p className="subtitle">{doc.kind === 'qa' ? 'QA check' : 'Review'} · {done} of {doc.clips.length} clips done</p>
+      <p className="subtitle">{doc.kind === 'qa' ? 'QA check' : 'Review'} · {done} of {doc.clips.length} clips done
+        {cfg && doc.pr && <> · your claim is <PrLink repo={cfg.repo} num={doc.pr} /></>}</p>
       <div className="progress" role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={doc.clips.length}>
         <span style={{ width: `${(done / doc.clips.length) * 100}%` }} />
       </div>
@@ -121,8 +203,13 @@ export function Batch() {
       <div style={{ display: 'flex', gap: 10, margin: '16px 0' }}>
         {next
           ? <Button icon={ChevronRight} onClick={() => nav(`/batch/${batch}/clip/${next.id}`)}>{done ? 'Next clip' : 'Start reviewing'}</Button>
-          : <Button icon={Send} onClick={submit} disabled={sent}>{sent ? 'Submitted' : 'Submit batch'}</Button>}
+          : <Button icon={Send} onClick={submit} disabled={sent || !!sending}>{sent ? 'Submitted' : 'Submit batch'}</Button>}
       </div>
+      {sending && <div style={{ marginBottom: 16 }}><Busy step="Sending your reviews to Hugging Face and publishing your claim" since={sending} /></div>}
+      {sent && cfg && (
+        <p className="subtitle" style={{ marginBottom: 16 }}>Sent. The maintainer will check it on{' '}
+          <PrLink repo={cfg.repo} num={doc.pr}>pull request #{doc.pr}</PrLink>, where you can see it too.</p>
+      )}
       <div className="card" style={{ overflow: 'hidden' }}>
         {doc.clips.map((c) => (
           <Link key={c.id} className="batch-row" to={`/batch/${batch}/clip/${c.id}`}>
@@ -191,6 +278,7 @@ export function Clip() {
   const [doc, setDoc] = useState(null)
   const [error, setError] = useState(null)
   const [langText, setLangText] = useState('')
+  const [finishing, setFinishing] = useState(false)
   const player = useRef(null)
   const queue = useRef(Promise.resolve())   // saves run in order, so "done" never overtakes an edit
   const nav = useNavigate()
@@ -231,13 +319,14 @@ export function Clip() {
   }
 
   async function finish(flagged) {
-    setError(null)
+    setError(null); setFinishing(true)
     try {
       await save({ done: true, flagged })
       const after = doc.clips.find((c) => !c.done && c.id !== id)
       showToast(flagged ? 'Flagged for the maintainer' : 'Saved')
       nav(after ? `/batch/${batch}/clip/${after.id}` : `/batch/${batch}`)
     } catch (e) { setError(e.message) }
+    setFinishing(false)
   }
 
   const langs = clipLangs(clip)
@@ -276,8 +365,8 @@ export function Clip() {
         <div style={{ flex: 1, minWidth: 200, fontSize: 13 }} className={error ? 'error-text' : 'subtitle'}>
           {error || (left ? `${left} segment${left > 1 ? 's' : ''} still to review.` : 'All segments reviewed.')}
         </div>
-        <Button variant="outline" icon={Flag} onClick={() => finish(true)}>Flag clip</Button>
-        <Button icon={Check} disabled={left > 0} onClick={() => finish(false)}>
+        <Button variant="outline" icon={Flag} disabled={finishing} onClick={() => finish(true)}>Flag clip</Button>
+        <Button icon={Check} disabled={left > 0 || finishing} onClick={() => finish(false)}>
           {doc.kind === 'qa' ? 'Mark QA complete' : 'Mark reviewed'}
         </Button>
       </div>

@@ -31,7 +31,8 @@ stays null otherwise, and later runs keep it.
 ```bash
 python3 review_admin.py batches --collection my-collection --minutes 30
 make hf-export
-cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset
+cd hf && hf upload ohcnetwork/scribe_dataset . --repo-type=dataset \
+  --delete "data/*" --delete "recordings/*" --delete "review/peaks/*"
 ```
 
 Reviewers now see the new batches. From here, follow
