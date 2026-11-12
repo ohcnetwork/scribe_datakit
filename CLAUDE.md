@@ -18,9 +18,9 @@ When someone asks you to set up or run the review app, do this from the repo roo
 3. Start it in the background with `make review`. It serves http://127.0.0.1:4321 and opens the
    browser. If that port is taken, run `.venv/bin/python review_server.py --port 4322`.
 4. Tell them to connect Hugging Face in the app, and walk them through "Connect Hugging Face"
-   in docs/reviewing.md. **The token goes in the app, never in this chat.** Don't read,
-   print or store it.
-5. Point them to docs/reviewing.md for how to review.
+   in README.md. **The token goes in the app, never in this chat.** Don't read, print or
+   store it.
+5. Point them to **Reviewer guide** in the app's sidebar for how to review.
 
 If batches won't load, check `.venv/bin/python -c "from huggingface_hub import HfApi; print(HfApi().whoami()['name'])"`.
 A 401 or 404 from Hugging Face usually means their account hasn't been given access to

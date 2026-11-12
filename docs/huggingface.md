@@ -2,7 +2,7 @@
 
 The corpus is published as a derived artifact. `metadata.json` stays the single source of
 truth; the HF dataset is regenerated from it, never edited in place. Reviews arrive as PRs
-on the same repo (see [reviewing.md](reviewing.md)).
+on the same repo (see [maintaining.md](maintaining.md)).
 
 ## Export
 

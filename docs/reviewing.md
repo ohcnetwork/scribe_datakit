@@ -1,60 +1,58 @@
 # Reviewing
 
-You listen to clinical recordings and correct the text Whisper produced. Everything runs
-on your own computer, and your work goes back through your Hugging Face account.
+What you do once the app is running. To install it, see the [README](../README.md#reviewers).
+The app's **Reviewer guide** has these same steps with screenshots.
 
-Once the app is open, **Reviewer guide** in its sidebar has these steps, plus the whole
-process from recording to release.
+## 1. Claim a batch
 
-## Set up
+A batch is about 30 minutes of audio, split across a few dozen recordings, which the app
+calls clips. Choose **Claim** on an available batch. Its audio then downloads to your
+computer, which can take a few minutes.
 
-You need [Git](https://git-scm.com/downloads), Python 3.11 or newer,
-[Node 18 or newer](https://nodejs.org), and a free
-[Hugging Face account](https://huggingface.co/join) that the maintainer has added.
+| What you see | What it means | What you can do |
+|---|---|---|
+| Available | Nobody has it | Choose **Claim** |
+| Claimed by you | You're working on it | Choose **Continue** |
+| Claimed by someone else | Another reviewer has it | Pick a different batch |
+| Submitted, waiting for the maintainer | You've sent it in | Choose **Open** to look at it or make a fix |
+| Finished by someone | Accepted into the dataset | Nothing more to do |
 
-```bash
-git clone <this repo>
-cd scribe_dump
-make review
-```
+## 2. Work through the clips
 
-The first run takes a few minutes. The app then opens in your browser. Next time, run
-`make review` again from the same folder. Press Ctrl-C in the terminal to stop it.
+Choose **Start reviewing**, or **Next clip** if you've already begun. The app moves you on
+each time you finish a clip. You can open any clip in the list to change it until you submit.
 
-**Using Claude Code?** Open it in this folder and ask it to set up the review app.
-[`CLAUDE.md`](../CLAUDE.md) tells it what to do.
+## 3. Review a clip
 
-Windows: run these in [WSL](https://learn.microsoft.com/windows/wsl/install), which has `make`.
+1. **Listen to the whole clip.** Use the large play button, or click the waveform to jump.
+2. **Type the spoken languages.** Enter codes separated by commas, such as `ml, en`.
+   Whisper's guess is often wrong. If you enter only `en`, the translation boxes disappear.
+   Common codes: `ml` Malayalam, `en` English, `hi` Hindi, `ta` Tamil, `kn` Kannada,
+   `te` Telugu, `bn` Bengali, `mr` Marathi.
+3. **Pick a category.**
 
-## Connect Hugging Face
+   | Category | Use it for |
+   |---|---|
+   | `medical-scribe` | Clinical speech, such as a consultation or dictated note |
+   | `noisy-background` | Speech with a lot of noise behind it |
+   | `random` | Speech that isn't clinical |
+   | `music` | Mostly music |
+   | `silence` | Nothing to hear |
+   | `test` | Someone testing the microphone |
+   | `uncategorized` | The starting value. Leave it only if nothing else fits. |
 
-The first time, the app asks for an access token:
+4. **Check each segment.** Long clips are cut at pauses, and each segment has a play button
+   for just that part. Whisper's text is shown in grey above each box and starts off in the
+   box. For each box:
+   - If it's right, choose **Accept as is**.
+   - If it's wrong, type your correction. It saves when you click away.
+   - If there's no real speech, tick **No usable speech**. That segment then needs no text.
 
-1. Open [your access tokens](https://huggingface.co/settings/tokens) and choose **Create new token**.
-2. Choose the **Write** type and give it any name.
-3. Paste it into the app. It's stored on your computer only. Don't share it with anyone.
-
-## Review a batch
-
-A batch is about 30 minutes of audio.
-
-1. **Claim a batch.** Others then see it's taken. Its audio downloads to your computer.
-2. **Open a clip.** The waveform plays the whole recording. Each segment has its own play
-   button that plays just that part.
-3. **Check the languages.** Type what's really spoken, such as `ml, en`. Whisper's guess
-   is often wrong. Translation boxes disappear for English-only audio.
-4. **Review each segment.** Listen, then fix the text. If it's already right, use
-   **Accept as is**. A box you don't touch isn't counted as reviewed.
-5. **Mark reviewed.** This needs at least one reviewed box per segment. If you're
-   annotating in English only, you can leave the transcript boxes alone. The app takes you
-   to the next clip.
-6. **Submit the batch** when every clip is done. This sends your work to the maintainer.
-
-Your work saves after each box, so you can stop and come back. It stays on this computer
-until you submit, so finish a batch on the machine you started it on.
-
-If a segment has no real speech, tick **No usable speech**. If a whole clip has a problem,
-such as the wrong audio, use **Flag clip**.
+   A box you haven't touched doesn't count, even if Whisper's text was right. If you've been
+   asked to annotate in English only, review just the Translation box.
+5. **Finish the clip.** Choose **Mark reviewed** when no segments are left. If the whole clip
+   has a problem, such as the wrong audio, choose **Flag clip** instead. You don't need to
+   finish its segments first.
 
 ## How to write the text
 
@@ -69,17 +67,41 @@ such as the wrong audio, use **Flag clip**.
 - **Can't make out a word:** write `[unclear]`. Don't guess.
 
 Whisper's translation can read fluently and still be wrong, so check it against the audio.
+Whisper also sometimes invents text during silence or noise, such as "thanks for watching".
+If you can't hear it in the audio, take it out.
 
-## QA
+## 4. Submit the batch
 
-A QA batch works the same way, but starts from the first reviewer's text. Check it against
-the audio, fix anything wrong and choose **Mark QA complete**.
+When every clip is Done or Flagged, choose **Submit batch** on the batch page. This sends
+your work to the maintainer.
+
+If the maintainer asks for a fix, choose **Open** on the batch, make the change and choose
+**Submit batch** again. Your new work replaces what you sent. Once it's accepted, the batch
+shows as Finished and you can claim another.
+
+## Stopping and coming back
+
+Your work saves as you go. Press Ctrl-C in the terminal to stop. To come back, run
+`make review` from the same folder and choose **Continue**.
+
+Your work stays on this computer until you submit, so finish a batch on the machine you
+started it on, and don't delete the `review_work` folder.
+
+## QA batches
+
+A QA batch is a second check. It works the same way, but the boxes start with the first
+reviewer's text. Check it against the audio, fix anything wrong and choose **Mark QA
+complete**.
 
 ## If something goes wrong
 
-| Problem | What to do |
+| What you see | What to do |
 |---|---|
-| "Hugging Face didn't accept that token" | Create a new token with the **Write** type. |
-| The batch list is empty or won't load | Ask the maintainer to confirm your account has access. |
+| **Mark reviewed** is greyed out | A segment still needs a reviewed box. Look for one with **Accept as is** buttons and no green border. |
+| "Use language codes such as ml or en." | Use two or three letter codes separated by commas. |
+| No **Submit batch** button | A clip is still To do. Choose **Next clip** to go to it. |
+| "No batches are ready yet." | Ask the maintainer when the next batches are coming, and whether your account has access. |
 | "already claimed this batch" | Someone got there first. Choose another batch. |
+| "Hugging Face didn't accept that token" | Create a new token with the **Write** type. |
+| A clip's audio won't play | Reload the page. If it still won't play, choose **Flag clip**. |
 | You can't finish a batch | Tell the maintainer, who can release it for someone else. |

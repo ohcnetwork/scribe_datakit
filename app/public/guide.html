@@ -91,15 +91,7 @@ section > .head { display: grid; gap: 8px; border-top: 2px solid var(--ink); pad
 }
 .steps .body { display: grid; gap: 10px; min-width: 0; }
 
-.cmd { background: var(--code-bg); color: var(--code-fg); border-radius: 6px; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; min-width: 0; }
-.cmd pre { margin: 0; flex: 1; min-width: 0; overflow-x: auto; font: 400 .9rem/1.55 var(--mono); }
-.copy { flex: none; font: 500 .78rem var(--mono); color: var(--code-fg); background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
 
-.note { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
-
-.needs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 26px; }
-.needs li { border-bottom: 1px solid var(--line); padding-bottom: 8px; min-width: 0; }
-.needs b { display: block; }
 
 /* Example of one segment on the review screen */
 .segment { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
@@ -129,6 +121,11 @@ section > .head { display: grid; gap: 8px; border-top: 2px solid var(--ink); pad
 .flow-key { display: grid; grid-template-columns: 112px minmax(0, 1fr) 118px; gap: 14px; font: 500 .74rem var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .flow-key span:last-child { text-align: right; }
 
+.shot { margin: 0; display: grid; gap: 8px; }
+.shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+.shot figcaption { font-size: .92rem; color: var(--muted); }
+.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.codes td { white-space: nowrap; padding-right: 22px; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); }
@@ -138,7 +135,7 @@ footer { padding-block: 56px 48px; color: var(--muted); font-size: .92rem; }
 
 @media (max-width: 640px) {
   body { font-size: 16px; }
-  .needs, .rules, .seg-body { grid-template-columns: minmax(0, 1fr); }
+  .rules, .seg-body { grid-template-columns: minmax(0, 1fr); }
   .seg-col + .seg-col { border-left: 0; border-top: 1px solid var(--line); }
   .flow-key { display: none; }
   .flow li { grid-template-columns: minmax(0, 1fr) auto; }
@@ -155,9 +152,9 @@ footer { padding-block: 56px 48px; color: var(--muted); font-size: .92rem; }
     <h1>Listen. Fix the text. Send it back.</h1>
     <p class="lede">Whisper has written a first draft for each clinical recording. You check that draft against the audio, so the speech models trained on it learn from text a person has confirmed.</p>
     <div class="actions">
-      <a class="btn solid" href="#start">Get started</a>
-      <a class="btn line" href="#review">Review a batch</a>
-      <a class="btn line" href="#process">See the whole process</a>
+      <a class="btn solid" href="#batches">Start your first batch</a>
+      <a class="btn line" href="#writing">How to write the text</a>
+      <a class="btn line" href="#help">If something goes wrong</a>
     </div>
   </div>
   <div class="recording" aria-hidden="true">
@@ -168,64 +165,97 @@ footer { padding-block: 56px 48px; color: var(--muted); font-size: .92rem; }
 </header>
 
 <main class="wrap">
-  <section id="start">
+  <section id="batches">
     <div class="head">
-      <h2>Get started</h2>
-      <p class="muted">Setup takes a few minutes and you only do it once. The app runs on your own computer.</p>
+      <span class="eyebrow">Stage 1 of 4</span>
+      <h2>Claim a batch</h2>
+      <p class="muted">A batch is about 30 minutes of audio, split across a few dozen recordings. The app calls each recording a clip. Plan on it taking several sittings, because you listen to everything at least once.</p>
     </div>
-    <ul class="needs">
-      <li><b>Hugging Face account</b>Free. <a href="https://huggingface.co/join">Create one</a> if you don't have it.</li>
-      <li><b>Git</b><a href="https://git-scm.com/downloads">Download Git</a></li>
-      <li><b>Python 3.11 or newer</b><a href="https://www.python.org/downloads/">Download Python</a></li>
-      <li><b>Node 18 or newer</b><a href="https://nodejs.org">Download Node</a></li>
-    </ul>
-    <ol class="steps">
-      <li><div class="body">
-        <h3>Ask for access</h3>
-        <p>Send the maintainer your Hugging Face username. They'll add you and send you the link to the code.</p>
-      </div></li>
-      <li><div class="body">
-        <h3>Install and open the app</h3>
-        <p>Run this in a terminal, using the link from the maintainer. The first run takes a few minutes, then the app opens in your browser.</p>
-        <div class="cmd"><pre id="c1">git clone &lt;link from the maintainer&gt;
-cd scribe_dump
-make review</pre><button class="copy" type="button" data-for="c1">Copy</button></div>
-        <p class="muted">On Windows, run this inside <a href="https://learn.microsoft.com/windows/wsl/install">WSL</a>. Next time, run <code>make review</code> from the same folder. Press Ctrl-C in the terminal to stop the app.</p>
-      </div></li>
-      <li><div class="body">
-        <h3>Connect Hugging Face</h3>
-        <p>Open <a href="https://huggingface.co/settings/tokens">your access tokens</a>, choose <b>Create new token</b>, pick the <b>Write</b> type and give it any name. Paste it into the app.</p>
-        <p class="muted">The token stays on your computer. Don't share it with anyone, and don't paste it into a chat.</p>
-      </div></li>
-      <li><div class="body">
-        <h3>Claim your first batch</h3>
-        <p>A batch is about 30 minutes of audio. Choose <b>Claim</b> and its audio downloads to your computer. Other reviewers will see it's taken.</p>
-      </div></li>
-    </ol>
-    <div class="note">
-      <h3>Using Claude Code?</h3>
-      <p>Open Claude Code in the <code>scribe_dump</code> folder and ask it to set up the review app. It will check your tools and start the app. You still paste the token into the app yourself.</p>
-    </div>
+    <figure class="shot"><img src="guide/batches.png" width="1180" height="560" alt="The Review batches page, listing five batches in different states." loading="lazy"><figcaption>The Batches page. Names and text in these pictures are examples.</figcaption></figure>
+    <p>Choose <b>Claim</b> on any available batch. The button shows <b>Downloading…</b> while the audio comes to your computer, which can take a few minutes. The audio then stays on your computer.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>What you see</th><th>What it means</th><th>What you can do</th></tr></thead>
+      <tbody>
+        <tr><td>Available</td><td>Nobody has it</td><td>Choose <b>Claim</b></td></tr>
+        <tr><td>Claimed by you</td><td>You're working on it</td><td>Choose <b>Continue</b></td></tr>
+        <tr><td>Claimed by someone else</td><td>Another reviewer has it</td><td>Pick a different batch</td></tr>
+        <tr><td>Submitted, waiting for the maintainer</td><td>You've sent it in</td><td>Choose <b>Open</b> to look at it or make a fix</td></tr>
+        <tr><td>Finished by someone</td><td>Accepted into the dataset</td><td>Nothing more to do</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">Batch names with <code>qa</code> in them are second checks. See <a href="#qa">QA batches</a>.</p>
   </section>
 
-  <section id="review">
+  <section id="batch">
     <div class="head">
-      <h2>Review a batch</h2>
-      <p class="muted">Your work saves after each box, so you can stop and come back.</p>
+      <span class="eyebrow">Stage 2 of 4</span>
+      <h2>Work through the clips</h2>
     </div>
+    <figure class="shot"><img src="guide/batch.png" width="1180" height="640" alt="A batch page showing 3 of 6 clips done, with a Next clip button and a list of clips marked Done, Flagged or To do." loading="lazy"><figcaption>The batch page shows how far you've got.</figcaption></figure>
+    <p>Choose <b>Start reviewing</b>, or <b>Next clip</b> if you've already begun. The app moves you to the next clip each time you finish one, so you rarely need this page. You can also open any clip in the list to look at it again or change it, up until you submit.</p>
+  </section>
+
+  <section id="clip">
+    <div class="head">
+      <span class="eyebrow">Stage 3 of 4</span>
+      <h2>Review a clip</h2>
+      <p class="muted">Do these steps for each clip. Most of your time goes on step 4.</p>
+    </div>
+    <figure class="shot"><img src="guide/clip.png" width="1180" height="1000" alt="The clip page: a waveform player, the spoken languages and category boxes, and two segments. The first has both boxes marked Reviewed. The second still has Accept as is buttons." loading="lazy"><figcaption>The first segment here is reviewed. The second still needs checking.</figcaption></figure>
     <ol class="steps">
-      <li><div class="body"><h3>Open a clip</h3><p>The waveform plays the whole recording. Each segment has its own play button for just that part.</p></div></li>
-      <li><div class="body"><h3>Check the languages</h3><p>Type what's really spoken, such as <code>ml, en</code>. Whisper's guess is often wrong. For English-only audio, the translation boxes disappear.</p></div></li>
-      <li><div class="body"><h3>Review each segment</h3><p>Listen, then fix the text. If it's already right, choose <b>Accept as is</b>. A box you don't touch isn't counted as reviewed.</p></div></li>
-      <li><div class="body"><h3>Choose Mark reviewed</h3><p>Each segment needs at least one reviewed box. If you're annotating in English only, you can leave the transcript boxes alone. The app then takes you to the next clip.</p></div></li>
-      <li><div class="body"><h3>Choose Submit batch</h3><p>Do this when every clip is done. It sends your work to the maintainer. Until then your work is only on this computer, so finish a batch on the machine you started it on.</p></div></li>
+      <li><div class="body">
+        <h3>Listen to the whole clip</h3>
+        <p>Press the large play button, or click the waveform to jump to a point. Hearing it all first gives you the context for each part.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Type the spoken languages</h3>
+        <p>Enter a code for each language you hear, separated by commas, such as <code>ml, en</code>. The grey hint shows Whisper's guess, which is often wrong, so go by what you hear.</p>
+        <div class="table-wrap"><table class="codes">
+          <tbody>
+            <tr><td><code>ml</code> Malayalam</td><td><code>en</code> English</td><td><code>hi</code> Hindi</td><td><code>ta</code> Tamil</td></tr>
+            <tr><td><code>kn</code> Kannada</td><td><code>te</code> Telugu</td><td><code>bn</code> Bengali</td><td><code>mr</code> Marathi</td></tr>
+          </tbody>
+        </table></div>
+        <p>If you enter only <code>en</code>, the translation boxes disappear, because English audio doesn't need translating.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Pick a category</h3>
+        <div class="table-wrap"><table>
+          <tbody>
+            <tr><td><code>medical-scribe</code></td><td>Clinical speech, such as a consultation or dictated note</td></tr>
+            <tr><td><code>noisy-background</code></td><td>Speech with a lot of noise behind it</td></tr>
+            <tr><td><code>random</code></td><td>Speech that isn't clinical</td></tr>
+            <tr><td><code>music</code></td><td>Mostly music</td></tr>
+            <tr><td><code>silence</code></td><td>Nothing to hear</td></tr>
+            <tr><td><code>test</code></td><td>Someone testing the microphone</td></tr>
+            <tr><td><code>uncategorized</code></td><td>The starting value. Leave it only if nothing else fits.</td></tr>
+          </tbody>
+        </table></div>
+      </div></li>
+      <li><div class="body">
+        <h3>Check each segment</h3>
+        <p>A long clip is cut into segments at natural pauses. Each one has a small play button that plays only that part, so you can replay a phrase as often as you need.</p>
+        <p>Each segment has a <b>Transcript</b> box and a <b>Translation</b> box. Whisper's text is shown in grey above each box, and it starts off in the box ready for you to edit. For each box, do one of these:</p>
+        <ul class="plain">
+          <li><b>It's right:</b> choose <b>Accept as is</b>.</li>
+          <li><b>It's wrong:</b> type your correction in the box. It saves when you click away.</li>
+          <li><b>There's no real speech:</b> tick <b>No usable speech</b>. That segment then needs no text.</li>
+        </ul>
+        <p>A box shows <b>Reviewed</b> once it counts, and the segment turns green. A box you haven't touched doesn't count, even if Whisper's text was right.</p>
+        <p>If you've been asked to annotate in English only, review just the Translation box and leave the Transcript box alone. Your maintainer will tell you which applies.</p>
+      </div></li>
+      <li><div class="body">
+        <h3>Finish the clip</h3>
+        <p>The bottom bar counts the segments left. When it reaches zero, choose <b>Mark reviewed</b>. The app saves the clip and opens the next one.</p>
+        <p>If there's a problem with the whole clip, such as the wrong audio or sound that won't play, choose <b>Flag clip</b> instead. You don't need to finish its segments first, and the maintainer will decide what to do with it.</p>
+      </div></li>
     </ol>
     <figure class="segment" style="margin:0">
-      <div class="seg-top"><span>Example segment · 0:28 to 0:47</span><span>invented for this guide</span></div>
+      <div class="seg-top"><span>Example correction</span><span>invented for this guide</span></div>
       <div class="seg-body">
         <div class="seg-col">
           <span class="lbl">Whisper's translation</span>
-          <p>The patient has <span class="wrong">fever</span> for three days. Give paracetamol <span class="wrong">50</span> mg.</p>
+          <p>The patient has had <span class="wrong">fever</span> for three days. Give paracetamol <span class="wrong">50</span> mg.</p>
         </div>
         <div class="seg-col">
           <span class="lbl">After your review</span>
@@ -233,14 +263,7 @@ make review</pre><button class="copy" type="button" data-for="c1">Copy</button><
         </div>
       </div>
     </figure>
-    <p class="muted">Two small words changed the clinical meaning, and Whisper's version still read smoothly. That's why every line gets checked against the audio.</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>If you find</th><th>Do this</th></tr></thead>
-      <tbody>
-        <tr><td>A segment with no real speech</td><td>Tick <b>No usable speech</b></td></tr>
-        <tr><td>A problem with the whole clip, such as the wrong audio</td><td>Choose <b>Flag clip</b></td></tr>
-      </tbody>
-    </table></div>
+    <p class="muted">Two small changes reversed the clinical meaning, and Whisper's version still read smoothly. That's why every line gets checked against the audio.</p>
   </section>
 
   <section id="writing">
@@ -255,6 +278,31 @@ make review</pre><button class="copy" type="button" data-for="c1">Copy</button><
       <h3>Take extra care with these</h3>
       <p>Write numbers, units and doses exactly as spoken, and listen again if you're unsure. Doses, left and right, and negation such as "no fever" need the closest attention, because one wrong word changes the meaning.</p>
     </div>
+    <p>Whisper sometimes invents text during silence or noise, such as "thanks for watching". If you can't hear it in the audio, take it out.</p>
+  </section>
+
+  <section id="submit">
+    <div class="head">
+      <span class="eyebrow">Stage 4 of 4</span>
+      <h2>Submit the batch</h2>
+    </div>
+    <p>When every clip is Done or Flagged, the batch page shows <b>Submit batch</b>. Choose it to send your work to the maintainer. The batch then shows as <b>Submitted, waiting for the maintainer</b>.</p>
+    <p>If the maintainer asks for a fix, go to the Batches page and choose <b>Open</b> on that batch. Make the change, then choose <b>Submit batch</b> again. Your new work replaces what you sent before.</p>
+    <p>Once the maintainer accepts it, the batch shows as <b>Finished</b>, and you can claim another.</p>
+  </section>
+
+  <section id="pause">
+    <div class="head"><h2>Stopping and coming back</h2></div>
+    <p>Your work saves as you go, so you can stop at any point. To stop, press Ctrl-C in the terminal. To come back, run <code>make review</code> from the same folder, then choose <b>Continue</b> on your batch.</p>
+    <div class="danger">
+      <h3>Your work is on this computer until you submit</h3>
+      <p>Finish a batch on the computer you started it on, and don't delete the <code>review_work</code> folder. If you can't finish a batch, tell the maintainer so someone else can take it.</p>
+    </div>
+  </section>
+
+  <section id="qa">
+    <div class="head"><h2>QA batches</h2></div>
+    <p>A QA batch is a second check. It works the same way, but the boxes start with the first reviewer's text instead of only Whisper's. Check that text against the audio, fix anything that's wrong and choose <b>Mark QA complete</b> at the end of each clip.</p>
   </section>
 
   <section id="process">
@@ -271,7 +319,7 @@ make review</pre><button class="copy" type="button" data-for="c1">Copy</button><
         <li><span class="who">Maintainer</span><div class="text"><h3>Publish batches</h3><p>Recordings are grouped into batches of about 30 minutes.</p></div><span class="status">pending</span></li>
         <li class="you"><span class="who">You</span><div class="text"><h3>Review and submit</h3><p>You claim a batch, correct it against the audio and submit it.</p></div><span class="status">reviewed or flagged</span></li>
         <li><span class="who">Maintainer</span><div class="text"><h3>Check and accept</h3><p>Your submission is checked, then added to the dataset with your username as the reviewer.</p></div><span class="status">reviewed</span></li>
-        <li><span class="who">QA reviewer</span><div class="text"><h3>Second check, if needed</h3><p>A QA batch starts from the first reviewer's text. The QA reviewer checks it against the audio, fixes anything wrong and chooses <b>Mark QA complete</b>.</p></div><span class="status">qa_complete</span></li>
+        <li><span class="who">QA reviewer</span><div class="text"><h3>Second check, if needed</h3><p>Another person checks the text against the audio and fixes anything wrong.</p></div><span class="status">qa_complete</span></li>
         <li><span class="who">Maintainer</span><div class="text"><h3>Finalize</h3><p>Only the maintainer can mark a recording final.</p></div><span class="status">final</span></li>
         <li><span class="who">Maintainer</span><div class="text"><h3>Release</h3><p>The dataset is published on Hugging Face for training and fine-tuning, including models that turn Malayalam and mixed-language clinical speech into English text.</p></div><span class="status">final</span></li>
       </ol>
@@ -281,18 +329,23 @@ make review</pre><button class="copy" type="button" data-for="c1">Copy</button><
   <section id="help">
     <div class="head"><h2>If something goes wrong</h2></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Problem</th><th>What to do</th></tr></thead>
+      <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
       <tbody>
-        <tr><td>"Hugging Face didn't accept that token"</td><td>Create a new token with the <b>Write</b> type.</td></tr>
-        <tr><td>The batch list is empty or won't load</td><td>Ask the maintainer to confirm your account has access.</td></tr>
+        <tr><td><b>Mark reviewed</b> is greyed out</td><td>A segment still needs a reviewed box. Look for one with <b>Accept as is</b> buttons and no green border.</td></tr>
+        <tr><td>"Use language codes such as ml or en."</td><td>Use two or three letter codes separated by commas.</td></tr>
+        <tr><td>No <b>Submit batch</b> button</td><td>A clip is still To do. Choose <b>Next clip</b> to go to it.</td></tr>
+        <tr><td>"2 clip(s) still need review."</td><td>Open the clips marked To do and finish them.</td></tr>
+        <tr><td>"No batches are ready yet."</td><td>Ask the maintainer when the next batches are coming, and whether your account has access.</td></tr>
         <tr><td>"already claimed this batch"</td><td>Someone got there first. Choose another batch.</td></tr>
+        <tr><td>"Hugging Face didn't accept that token"</td><td>Create a new token with the <b>Write</b> type.</td></tr>
+        <tr><td>A clip's audio won't play</td><td>Reload the page. If it still won't play, choose <b>Flag clip</b>.</td></tr>
         <tr><td>You can't finish a batch</td><td>Tell the maintainer, who can release it for someone else.</td></tr>
       </tbody>
     </table></div>
   </section>
 </main>
 
-<footer class="wrap"><p>Keep the <code>review_work</code> folder until your batch is submitted. It holds your unsent work.</p></footer>
+<footer class="wrap"><p>Still stuck? Ask your maintainer.</p></footer>
 
 <script>
 (function () {
@@ -310,18 +363,5 @@ make review</pre><button class="copy" type="button" data-for="c1">Copy</button><
   }
   svg.innerHTML = out;
 
-  document.querySelectorAll('.copy').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var el = document.getElementById(b.dataset.for), done = function (m) {
-        b.textContent = m; setTimeout(function () { b.textContent = 'Copy'; }, 1500);
-      };
-      var select = function () {
-        var r = document.createRange(); r.selectNodeContents(el);
-        var s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected');
-      };
-      try { navigator.clipboard.writeText(el.textContent).then(function () { done('Copied'); }, select); }
-      catch (e) { select(); }
-    });
-  });
 })();
 </script>

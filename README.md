@@ -3,16 +3,71 @@
 Multilingual clinical speech with Whisper drafts and human-reviewed transcripts and
 English translations, built for fine-tuning speech-to-English models.
 
-Reviewers: start with **[docs/reviewing.md](docs/reviewing.md)**. The app has the same
-steps under **Reviewer guide** ([source](app/public/guide.html)). The rest of this page is
-for the maintainer.
+- **Here to review recordings?** Go to [Reviewers](#reviewers).
+- **Running the dataset?** Go to [Maintainers](#maintainers).
 
-The dataset isn't in this repo. Audio, `flac/`, `peaks/` and `metadata.json` are
-git-ignored and stay local; the published copy is
+## Reviewers
+
+You listen to recordings and correct the text Whisper produced, using an app that runs on
+your own computer. Setup takes a few minutes and you only do it once.
+
+### 1. Get access
+
+Create a free [Hugging Face account](https://huggingface.co/join) and send your username to
+the maintainer, who'll give you access.
+
+### 2. Install the tools
+
+You need [Git](https://git-scm.com/downloads), [Python 3.11 or newer](https://www.python.org/downloads/)
+and [Node 18 or newer](https://nodejs.org). On Windows, run everything in
+[WSL](https://learn.microsoft.com/windows/wsl/install), which also gives you `make`.
+
+### 3. Start the app
+
+```bash
+git clone <this repo>
+cd scribe_dump
+make review
+```
+
+The first run takes a few minutes, then the app opens in your browser at
+http://127.0.0.1:4321. Keep the terminal open while you work, and press Ctrl-C there to stop.
+Next time, run `make review` from the same folder.
+
+**Using Claude Code?** Open it in this folder and ask it to set up the review app.
+[CLAUDE.md](CLAUDE.md) tells it what to do.
+
+### 4. Connect Hugging Face
+
+The first time, the app asks for an access token:
+
+1. Open [your access tokens](https://huggingface.co/settings/tokens) and choose **Create new token**.
+2. Choose the **Write** type and give it any name.
+3. Paste it into the app. It's stored on your computer only. Don't share it with anyone.
+
+### 5. Start reviewing
+
+Open **Reviewer guide** in the app's sidebar. It takes you through claiming a batch,
+reviewing clips and submitting your work. [docs/reviewing.md](docs/reviewing.md) has the same
+steps without screenshots.
+
+## Maintainers
+
+| I want to | Go to |
+|---|---|
+| Add new recordings | [docs/ingesting-a-collection.md](docs/ingesting-a-collection.md) |
+| Create batches, or merge and finalise reviews | [docs/maintaining.md](docs/maintaining.md) |
+| Publish to Hugging Face | [docs/huggingface.md](docs/huggingface.md) |
+| Understand the fields and statuses | [design_spec.md](design_spec.md) |
+| See what reviewers are told | [docs/reviewing.md](docs/reviewing.md), and the in-app guide at [app/public/guide.html](app/public/guide.html) |
+| Change what coding agents do here | [CLAUDE.md](CLAUDE.md), which [AGENTS.md](AGENTS.md) points to |
+| Run the tests | [Tests](#tests) |
+
+The dataset isn't in this repo. Audio, `flac/`, `peaks/` and `metadata.json` are git-ignored
+and stay local. The published copy is
 [`ohcnetwork/scribe_dataset`](https://huggingface.co/datasets/ohcnetwork/scribe_dataset).
-See [design_spec.md](design_spec.md) for the data model and statuses.
 
-## Layout
+### Layout
 
 | Path | What |
 |---|---|
@@ -28,7 +83,7 @@ See [design_spec.md](design_spec.md) for the data model and statuses.
 | `migrate_schema_v2.py` | one-off v1 → v2 metadata migration; keeps `metadata.v1.json` |
 | `test_*.py`, `app/e2e/` | checks, run with `make test` |
 
-## Prerequisites
+### Prerequisites
 
 - **ffmpeg and ffprobe** on PATH (`brew install ffmpeg`).
 - **Python 3.11+**. `extract_peaks.py` uses `audioop`, which Python 3.13 removed.
@@ -36,7 +91,7 @@ See [design_spec.md](design_spec.md) for the data model and statuses.
 - Whisper: `pip install -r requirements.txt` (Apple Silicon). The ~3 GB model downloads
   on the first run.
 
-## Processing audio
+### Processing audio
 
 To add recordings, see [docs/ingesting-a-collection.md](docs/ingesting-a-collection.md).
 `make ingest COLLECTION=<name>` runs these steps in order:
@@ -54,11 +109,7 @@ Durations come from the audio packets themselves, because broken container times
 inflate what ffmpeg reports; `corrupt` marks those clips. `segment_audio.py` rebuilds
 their timeline, so they're usable like any other clip.
 
-## Review workflow
-
-See [docs/maintaining.md](docs/maintaining.md) for how batches are created, claimed and merged.
-
-## Tests
+### Tests
 
 ```bash
 make test                                                   # everything offline
