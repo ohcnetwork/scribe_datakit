@@ -114,7 +114,7 @@ their timeline, so they're usable like any other clip.
 
 ```bash
 make test                                                   # everything offline
-SCRIBE_LIVE_REPO=gigincg/test_repo python3 test_review_live.py   # against the real Hub
+SCRIBE_LIVE_REPO=<you>/<test-repo> python3 test_review_live.py   # against the real Hub
 ```
 
 `test_review_ui.py` drives the app in Chrome with real audio. It needs `cd app && npm ci`.

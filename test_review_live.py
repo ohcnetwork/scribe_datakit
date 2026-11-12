@@ -3,7 +3,7 @@
 
 Skipped unless you name a throwaway repo you own:
 
-    SCRIBE_LIVE_REPO=gigincg/test_repo python3 test_review_live.py
+    SCRIBE_LIVE_REPO=<you>/<test-repo> python3 test_review_live.py
 """
 import json, os, sys, tempfile, time
 
